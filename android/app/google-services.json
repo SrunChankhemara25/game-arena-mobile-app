@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "26134867441",
+    "project_id": "game-arena-e77d2",
+    "storage_bucket": "game-arena-e77d2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:26134867441:android:12a3295454845857f92850",
+        "android_client_info": {
+          "package_name": "com.example.gamearena_new"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "26134867441-b24rknfujkog5rjpo4u24fab7t5ohsa7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuXfTYhCewFHvQBnVIApUkWSXjWrEIs88"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "26134867441-b24rknfujkog5rjpo4u24fab7t5ohsa7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "26134867441-r3eq3ca5hmc7jglr0jec8pcka2tu4n54.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.gamearenaNew"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:26134867441:android:79e06d2a64c7fc6cf92850",
+        "android_client_info": {
+          "package_name": "com.khemara.gamearena"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "26134867441-fagfm8da6f6mats750aeiqul0oi3kk69.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.khemara.gamearena",
+            "certificate_hash": "7390cdc8ce6dfeb6396944ce3aec9924da8594c6"
+          }
+        },
+        {
+          "client_id": "26134867441-b24rknfujkog5rjpo4u24fab7t5ohsa7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuXfTYhCewFHvQBnVIApUkWSXjWrEIs88"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "26134867441-b24rknfujkog5rjpo4u24fab7t5ohsa7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "26134867441-r3eq3ca5hmc7jglr0jec8pcka2tu4n54.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.gamearenaNew"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
