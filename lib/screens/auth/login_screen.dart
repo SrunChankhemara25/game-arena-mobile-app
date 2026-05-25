@@ -2,11 +2,16 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../services/auth_service.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 import 'verify_code_screen.dart';
+
+// ─── EXACT PATH FROM YOUR SCREENSHOT ───
+// Change 'admin_dashboard.dart' to your exact file name if it's named differently
+import 'package:gamearena_new/screens/admin/admin_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -79,21 +84,42 @@ class _LoginScreenState extends State<LoginScreen>
       final inputPassword = _passController.text;
 
       await AuthService().loginUser(inputEmail, inputPassword, isGoogle: false);
-      await AuthService().sendVerificationCode(inputEmail);
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(inputEmail.toLowerCase())
+          .get();
+
+      final String role = userDoc.data()?['role'] as String? ?? 'user';
 
       if (!mounted) return;
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => VerifyCodeScreen(
-            email: inputEmail,
-            password: inputPassword,
-            isSignup: false,
-            isReset: false,
+      if (role == 'admin') {
+        await AuthService().saveUserSession(inputEmail);
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AdminDashboard(),
           ),
-        ),
-      );
+        );
+      } else {
+        await AuthService().sendVerificationCode(inputEmail);
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VerifyCodeScreen(
+              email: inputEmail,
+              password: inputPassword,
+              isSignup: false,
+              isReset: false,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(

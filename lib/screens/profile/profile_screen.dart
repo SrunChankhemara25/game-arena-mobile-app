@@ -121,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         context,
                         MaterialPageRoute(
                             builder: (_) =>
-                                const admin_dashboard.MasterAdminDashboard()),
+                                const admin_dashboard.AdminDashboard()),
                       );
                     },
                   ),

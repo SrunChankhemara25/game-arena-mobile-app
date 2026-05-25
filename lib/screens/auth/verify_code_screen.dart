@@ -263,7 +263,8 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen>
               children: [
                 Positioned(
                   top: 16,
-                  right: 16,
+                  left:
+                      16, // 👈 CHANGED FROM right: 16 TO MOUNT TO THE LEFT CORNER
                   child: GestureDetector(
                     onTap: _handleBackNavigation,
                     child: Container(
