@@ -5,6 +5,45 @@ import '../../models/models.dart';
 import '../../widgets/common/widgets.dart';
 import '../team/team_detail_screen.dart';
 
+// ─── Icon constants — thin outlined style ─────────────────────────────────────
+class AppIcons {
+  // Use outlined variants everywhere for a flat, non-AI aesthetic
+  static const trophy = Icons.emoji_events_outlined;
+  static const team = Icons.group_outlined;
+  static const format = Icons.account_tree_outlined;
+  static const calendar = Icons.calendar_today_outlined;
+  static const calendarEnd = Icons.event_outlined;
+  static const clock = Icons.schedule_outlined;
+  static const location = Icons.place_outlined;
+  static const org = Icons.corporate_fare_outlined;
+  static const info = Icons.info_outlined;
+  static const list = Icons.format_list_bulleted_outlined;
+  static const flag = Icons.flag_outlined;
+  static const person = Icons.person_outline;
+  static const chevronRight = Icons.chevron_right;
+  static const back = Icons.arrow_back_ios;
+  static const share = Icons.ios_share_outlined;
+  static const leaderboard = Icons.bar_chart_outlined;
+  static const star = Icons.star_outline;
+  static const add = Icons.add_circle_outline;
+  static const check = Icons.check_circle_outline;
+  static const live = Icons.radio_button_checked_outlined;
+  static const tag = Icons.label_outline;
+  static const upload = Icons.upload_outlined;
+  static const photo = Icons.photo_camera_outlined;
+  static const delete = Icons.delete_outline;
+  static const email = Icons.mail_outline;
+  static const phone = Icons.phone_outlined;
+  static const badge = Icons.badge_outlined;
+  static const gamepad = Icons.sports_esports_outlined;
+  static const send = Icons.send_outlined;
+  static const hourglass = Icons.hourglass_empty_outlined;
+  static const question = Icons.help_outline;
+  static const medal = Icons.military_tech_outlined;
+  static const arrowFwd = Icons.arrow_forward;
+  static const personAdd = Icons.person_add_alt_1_outlined;
+}
+
 // ─── Tournament Detail Screen ─────────────────────────────────────────────────
 class TournamentDetailScreen extends StatefulWidget {
   final TournamentModel tournament;
@@ -26,7 +65,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen>
     'TEAMS',
     'SCHEDULE',
     'BRACKET',
-    'STANDINGS'
+    'STANDINGS',
   ];
 
   @override
@@ -57,7 +96,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen>
       body: NestedScrollView(
         headerSliverBuilder: (_, __) => [
           SliverAppBar(
-            expandedHeight: 230,
+            expandedHeight: 240,
             pinned: true,
             backgroundColor: AppColors.bg0,
             surfaceTintColor: Colors.transparent,
@@ -75,7 +114,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen>
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: const Icon(Icons.arrow_back_ios_rounded,
+                  child: const Icon(AppIcons.back,
                       size: 16, color: AppColors.textSecondary),
                 ),
               ),
@@ -91,7 +130,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen>
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: const Icon(Icons.share_rounded,
+                  child: const Icon(AppIcons.share,
                       size: 18, color: AppColors.textSecondary),
                 ),
               ),
@@ -107,7 +146,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen>
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(44),
+              preferredSize: const Size.fromHeight(48),
               child: Container(
                 decoration: const BoxDecoration(
                   color: AppColors.bg0,
@@ -168,9 +207,7 @@ class _TournamentHero extends StatelessWidget {
         ),
       ),
       child: Stack(children: [
-        // Decorative grid lines
         Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-        // Ghost emoji
         Positioned(
           right: -16,
           bottom: 40,
@@ -179,14 +216,12 @@ class _TournamentHero extends StatelessWidget {
             child: Text(t.game.emoji, style: const TextStyle(fontSize: 160)),
           ),
         ),
-        // Content
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 72, 20, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              // Status + game
               Row(children: [
                 _HeroBadge(
                   label: _statusLabel(t.status),
@@ -200,7 +235,6 @@ class _TournamentHero extends StatelessWidget {
                 ),
               ]),
               const SizedBox(height: 10),
-              // Title
               Text(t.title,
                   style: AppText.displayMd
                       .copyWith(letterSpacing: 0.3, height: 1.15)),
@@ -210,25 +244,24 @@ class _TournamentHero extends StatelessWidget {
                     style: AppText.body
                         .copyWith(color: AppColors.textMuted, fontSize: 12)),
               const SizedBox(height: 14),
-              // Stat Pills row
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(children: [
                   _StatPill(
-                    icon: Icons.emoji_events_rounded,
+                    icon: AppIcons.trophy,
                     value: t.prizePoolDisplay,
                     color: AppColors.gold,
                   ),
                   const SizedBox(width: 8),
                   _StatPill(
-                    icon: Icons.groups_rounded,
+                    icon: AppIcons.team,
                     value: '${t.registeredTeams}/${t.maxTeams} teams',
                     color: AppColors.cyan,
                   ),
                   if (t.location != null) ...[
                     const SizedBox(width: 8),
                     _StatPill(
-                      icon: Icons.location_on_rounded,
+                      icon: AppIcons.location,
                       value: t.location!,
                       color: AppColors.textSecondary,
                     ),
@@ -267,9 +300,9 @@ class _HeroBadge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: color.withOpacity(0.35)),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Text(label,
             style: AppText.label.copyWith(
@@ -288,9 +321,9 @@ class _StatPill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.25)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 12, color: color),
@@ -306,7 +339,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.cyan.withOpacity(0.03)
+      ..color = AppColors.cyan.withValues(alpha: 0.03)
       ..strokeWidth = 1;
     const spacing = 28.0;
     for (double x = 0; x < size.width; x += spacing) {
@@ -321,32 +354,33 @@ class _GridPainter extends CustomPainter {
   bool shouldRepaint(_) => false;
 }
 
-// ─── Section Header ───────────────────────────────────────────────────────────
-class _SectionHeader extends StatelessWidget {
-  final String title;
+// ─── Shared Section Label ────────────────────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
+  final String text;
   final IconData? icon;
-  const _SectionHeader({required this.title, this.icon});
+  const _SectionLabel({required this.text, this.icon});
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.only(bottom: 12),
         child: Row(children: [
-          Container(
-            width: 3,
-            height: 16,
-            decoration: BoxDecoration(
-              color: AppColors.cyan,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 10),
           if (icon != null) ...[
-            Icon(icon, size: 15, color: AppColors.cyan),
-            const SizedBox(width: 7),
+            Icon(icon, size: 14, color: AppColors.cyan),
+            const SizedBox(width: 8),
+          ] else ...[
+            Container(
+              width: 3,
+              height: 14,
+              decoration: BoxDecoration(
+                color: AppColors.cyan,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 10),
           ],
-          Text(title,
+          Text(text,
               style: AppText.label.copyWith(
-                  fontSize: 11,
+                  fontSize: 10,
                   letterSpacing: 2,
                   color: AppColors.textSecondary)),
         ]),
@@ -364,32 +398,28 @@ class _OverviewTab extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Stat Cards
         Row(children: [
           Expanded(
               child: _MiniStatCard(
                   label: 'PRIZE POOL',
                   value: t.prizePoolDisplay,
                   valueColor: AppColors.gold,
-                  icon: Icons.emoji_events_rounded)),
+                  icon: AppIcons.trophy)),
           const SizedBox(width: 10),
           Expanded(
               child: _MiniStatCard(
                   label: 'TEAMS',
                   value: '${t.registeredTeams}/${t.maxTeams}',
-                  icon: Icons.groups_rounded)),
+                  icon: AppIcons.team)),
           const SizedBox(width: 10),
           Expanded(
               child: _MiniStatCard(
                   label: 'FORMAT',
                   value: _formatShort(t.format),
-                  icon: Icons.account_tree_rounded)),
+                  icon: AppIcons.format)),
         ]),
         const SizedBox(height: 28),
-
-        // About
-        const _SectionHeader(
-            title: 'ABOUT THIS TOURNAMENT', icon: Icons.info_outline_rounded),
+        _SectionLabel(text: 'ABOUT THIS TOURNAMENT', icon: AppIcons.info),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: _cardDecor(),
@@ -397,46 +427,43 @@ class _OverviewTab extends StatelessWidget {
               style: AppText.body.copyWith(height: 1.7)),
         ),
         const SizedBox(height: 28),
-
-        // Details
-        const _SectionHeader(title: 'DETAILS', icon: Icons.list_alt_rounded),
+        _SectionLabel(text: 'DETAILS', icon: AppIcons.list),
         Container(
           decoration: _cardDecor(),
           child: Column(children: [
             _DetailRow(
-                icon: Icons.calendar_today_rounded,
+                icon: AppIcons.calendar,
                 label: 'Start',
                 value: t.startDateDisplay),
             _DetailRow(
-                icon: Icons.calendar_month_rounded,
+                icon: AppIcons.calendarEnd,
                 label: 'End',
                 value: t.endDateDisplay),
             _DetailRow(
-                icon: Icons.timer_outlined,
+                icon: AppIcons.clock,
                 label: 'Reg. Deadline',
                 value: t.registrationDeadlineDisplay),
             _DetailRow(
-                icon: Icons.location_on_rounded,
+                icon: AppIcons.location,
                 label: 'Location',
                 value: t.location ?? 'TBA'),
             _DetailRow(
-                icon: Icons.account_tree_rounded,
+                icon: AppIcons.format,
                 label: 'Format',
                 value: _formatLabel(t.format)),
             _DetailRow(
-                icon: Icons.business_rounded,
+                icon: AppIcons.org,
                 label: 'Organizer',
                 value: t.organizer ?? 'TBA',
                 isLast: true),
           ]),
         ),
-
         if (t.status == TournamentStatus.registration) ...[
           const SizedBox(height: 28),
           GlowButton(
             label: 'REGISTER YOUR TEAM',
             width: double.infinity,
-            icon: Icons.add_circle_outline_rounded,
+            icon: AppIcons.add,
             onTap: () {
               HapticFeedback.lightImpact();
               Navigator.push(
@@ -452,10 +479,10 @@ class _OverviewTab extends StatelessWidget {
     );
   }
 
-  BoxDecoration _cardDecor() => BoxDecoration(
+  BoxDecoration _cardDecor({Color? accentColor}) => BoxDecoration(
         color: AppColors.bg1,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: accentColor ?? AppColors.border),
       );
 
   String _formatShort(TournamentFormat f) => switch (f) {
@@ -550,109 +577,179 @@ class _TeamsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (tournament.teams.isEmpty) {
       return const EmptyState(
-          icon: Icons.groups_rounded,
+          icon: AppIcons.team,
           title: 'No Teams Yet',
           subtitle: 'Be the first to register your team');
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
       itemCount: tournament.teams.length + 1,
       itemBuilder: (_, i) {
         if (i == 0) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: _SectionHeader(
-                title: '${tournament.teams.length} REGISTERED TEAMS'),
+            child: Row(children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.cyan.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border:
+                      Border.all(color: AppColors.cyan.withValues(alpha: 0.3)),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(AppIcons.team, size: 13, color: AppColors.cyan),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${tournament.teams.length} REGISTERED',
+                    style: AppText.label.copyWith(
+                        color: AppColors.cyan, fontSize: 10, letterSpacing: 1),
+                  ),
+                ]),
+              ),
+            ]),
           );
         }
         final team = tournament.teams[i - 1];
-        return GestureDetector(
+        return _TeamCard(
+          team: team,
+          rank: i,
           onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => TeamDetailScreen(team: team))),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.bg1,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(children: [
-              // Rank
-              SizedBox(
-                width: 24,
-                child: Text('${i}',
-                    style: AppText.label
-                        .copyWith(color: AppColors.textMuted, fontSize: 12)),
-              ),
-              const SizedBox(width: 4),
-              TeamAvatar(team: team, size: 44),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Row(children: [
-                      Flexible(
-                        child: Text(team.name,
-                            style: AppText.heading.copyWith(fontSize: 15),
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                      const SizedBox(width: 8),
-                      _TeamStatusPill(status: team.status),
-                    ]),
-                    const SizedBox(height: 5),
-                    Text('${team.players.length} members · ${team.country}',
-                        style: AppText.caption),
-                  ])),
-              // W/L
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Row(children: [
-                  Text('${team.wins}',
-                      style: AppText.heading
-                          .copyWith(fontSize: 14, color: AppColors.green)),
-                  Text('W',
-                      style: AppText.caption.copyWith(color: AppColors.green)),
-                  const SizedBox(width: 8),
-                  Text('${team.losses}',
-                      style: AppText.heading
-                          .copyWith(fontSize: 14, color: AppColors.red)),
-                  Text('L',
-                      style: AppText.caption.copyWith(color: AppColors.red)),
-                ]),
-                const SizedBox(height: 4),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textMuted, size: 16),
-              ]),
-            ]),
-          ),
         );
       },
     );
   }
 }
 
-class _TeamStatusPill extends StatelessWidget {
-  final TeamStatus status;
-  const _TeamStatusPill({required this.status});
+class _TeamCard extends StatelessWidget {
+  final TeamModel team;
+  final int rank;
+  final VoidCallback onTap;
+  const _TeamCard(
+      {required this.team, required this.rank, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final (color, label) = switch (status) {
-      TeamStatus.approved => (AppColors.green, 'APPROVED'),
-      TeamStatus.pending => (AppColors.gold, 'PENDING'),
-      _ => (AppColors.red, 'REJECTED'),
+    final statusColor = switch (team.status) {
+      TeamStatus.approved => AppColors.green,
+      TeamStatus.pending => AppColors.gold,
+      _ => AppColors.red,
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.3)),
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.bg1,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+        ),
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: AppColors.bg3,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Center(
+                  child: Text('$rank',
+                      style: AppText.label
+                          .copyWith(color: AppColors.textMuted, fontSize: 12)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              TeamAvatar(team: team, size: 44),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(team.name,
+                        style: AppText.heading.copyWith(fontSize: 15),
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      const Icon(AppIcons.flag,
+                          size: 11, color: AppColors.textMuted),
+                      const SizedBox(width: 4),
+                      Text(team.country ?? 'Unknown',
+                          style: AppText.caption
+                              .copyWith(color: AppColors.textSecondary)),
+                      const SizedBox(width: 8),
+                      const Icon(AppIcons.person,
+                          size: 11, color: AppColors.textMuted),
+                      const SizedBox(width: 3),
+                      Text('${team.players.length} members',
+                          style: AppText.caption),
+                    ]),
+                  ])),
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Row(children: [
+                  Text('${team.wins}W',
+                      style: AppText.caption.copyWith(
+                          color: AppColors.green, fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 6),
+                  Text('${team.losses}L',
+                      style: AppText.caption.copyWith(
+                          color: AppColors.red, fontWeight: FontWeight.w700)),
+                ]),
+                const SizedBox(height: 6),
+                const Icon(AppIcons.chevronRight,
+                    color: AppColors.textMuted, size: 16),
+              ]),
+            ]),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.bg0.withValues(alpha: 0.5),
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(14)),
+              border: const Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  team.status.name.toUpperCase(),
+                  style:
+                      AppText.label.copyWith(color: statusColor, fontSize: 9),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${team.players.length} player${team.players.length == 1 ? '' : 's'} registered',
+                  style: AppText.caption
+                      .copyWith(color: AppColors.textSecondary, fontSize: 11),
+                ),
+              ),
+              // View-only indicator
+              Row(children: [
+                const Icon(Icons.visibility_outlined,
+                    size: 11, color: AppColors.textMuted),
+                const SizedBox(width: 4),
+                Text('View',
+                    style: AppText.caption
+                        .copyWith(color: AppColors.textMuted, fontSize: 10)),
+              ]),
+            ]),
+          ),
+        ]),
       ),
-      child:
-          Text(label, style: AppText.label.copyWith(color: color, fontSize: 9)),
     );
   }
 }
@@ -666,7 +763,7 @@ class _ScheduleTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (tournament.matches.isEmpty) {
       return const EmptyState(
-          icon: Icons.schedule_rounded,
+          icon: AppIcons.clock,
           title: 'No Matches Yet',
           subtitle: 'Schedule will be posted soon');
     }
@@ -677,15 +774,40 @@ class _ScheduleTab extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
       children: grouped.entries
           .map((e) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _SectionHeader(title: e.key.toUpperCase()),
-                  ...e.value
-                      .map((m) => _MatchCard(match: m, tournament: tournament)),
-                  const SizedBox(height: 12),
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.cyan.withValues(alpha: 0.15),
+                          AppColors.cyan.withValues(alpha: 0.05),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: AppColors.cyan.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(AppIcons.flag,
+                          size: 12, color: AppColors.cyan),
+                      const SizedBox(width: 6),
+                      Text(e.key.toUpperCase(),
+                          style: AppText.label.copyWith(
+                              color: AppColors.cyan,
+                              fontSize: 10,
+                              letterSpacing: 1.2)),
+                    ]),
+                  ),
+                  ...e.value.map((m) =>
+                      _ScheduleMatchCard(match: m, tournament: tournament)),
+                  const SizedBox(height: 8),
                 ],
               ))
           .toList(),
@@ -693,10 +815,10 @@ class _ScheduleTab extends StatelessWidget {
   }
 }
 
-class _MatchCard extends StatelessWidget {
+class _ScheduleMatchCard extends StatelessWidget {
   final MatchModel match;
   final TournamentModel tournament;
-  const _MatchCard({required this.match, required this.tournament});
+  const _ScheduleMatchCard({required this.match, required this.tournament});
 
   TeamModel? _findTeam(String? id) =>
       id == null ? null : tournament.teams.where((t) => t.id == id).firstOrNull;
@@ -712,27 +834,33 @@ class _MatchCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: AppColors.bg1,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isLive ? AppColors.red.withOpacity(0.5) : AppColors.border,
+          color:
+              isLive ? AppColors.red.withValues(alpha: 0.5) : AppColors.border,
           width: isLive ? 1.5 : 1,
         ),
+        boxShadow: isLive
+            ? [
+                BoxShadow(
+                    color: AppColors.red.withValues(alpha: 0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4))
+              ]
+            : null,
       ),
       child: Column(children: [
-        // Match meta
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(children: [
-            const Icon(Icons.access_time_rounded,
-                size: 11, color: AppColors.textMuted),
+            const Icon(AppIcons.clock, size: 11, color: AppColors.textMuted),
             const SizedBox(width: 5),
             Text(match.scheduledAt ?? 'TBA', style: AppText.caption),
             const Spacer(),
-            _MatchStatusPill(status: match.status),
+            _MatchStatusChip(status: match.status),
           ]),
         ),
         Container(height: 0.5, color: AppColors.border),
-        // Scores
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(children: [
@@ -806,9 +934,10 @@ class _TeamScoreWidget extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.green.withOpacity(0.1),
+                    color: AppColors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(3),
-                    border: Border.all(color: AppColors.green.withOpacity(0.3)),
+                    border: Border.all(
+                        color: AppColors.green.withValues(alpha: 0.3)),
                   ),
                   child: Text('WIN',
                       style: AppText.label
@@ -825,7 +954,7 @@ class _TeamScoreWidget extends StatelessWidget {
                 border: Border.all(color: AppColors.border),
               ),
               child: const Center(
-                  child: Icon(Icons.question_mark_rounded,
+                  child: Icon(AppIcons.question,
                       size: 14, color: AppColors.textMuted)),
             ),
             const SizedBox(height: 6),
@@ -836,23 +965,34 @@ class _TeamScoreWidget extends StatelessWidget {
       );
 }
 
-class _MatchStatusPill extends StatelessWidget {
+class _MatchStatusChip extends StatelessWidget {
   final String status;
-  const _MatchStatusPill({required this.status});
+  const _MatchStatusChip({required this.status});
 
   @override
   Widget build(BuildContext context) {
-    final (color, label) = switch (status) {
-      'live' => (AppColors.cyan, 'ONGOING'),
-      'completed' => (AppColors.green, '✓ DONE'),
-      _ => (AppColors.textMuted, 'UPCOMING'),
+    final (color, label, icon) = switch (status) {
+      'live' => (AppColors.cyan, 'LIVE', AppIcons.live),
+      'completed' => (AppColors.green, 'DONE', AppIcons.check),
+      _ => (AppColors.textMuted, 'UPCOMING', AppIcons.clock),
     };
-    return Text(label,
-        style: AppText.label.copyWith(color: color, fontSize: 10));
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 10, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: AppText.label.copyWith(color: color, fontSize: 9)),
+      ]),
+    );
   }
 }
 
-// ─── Bracket Tab ─────────────────────────────────────────────────────────────
+// ─── Bracket Tab ──────────────────────────────────────────────────────────────
 class _BracketTab extends StatelessWidget {
   final TournamentModel tournament;
   const _BracketTab({required this.tournament});
@@ -868,13 +1008,13 @@ class _BracketTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (tournament.matches.isEmpty) {
       return const EmptyState(
-          icon: Icons.account_tree_rounded,
+          icon: AppIcons.format,
           title: 'Bracket Not Available',
           subtitle: 'The bracket will be generated after registration closes');
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -916,13 +1056,19 @@ class _BracketColumn extends StatelessWidget {
   Widget build(BuildContext context) => Row(children: [
         Column(children: [
           Container(
-            width: 156,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            width: 168,
             margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.bg2,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppColors.border),
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.purple.withValues(alpha: 0.2),
+                  AppColors.cyan.withValues(alpha: 0.1),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(8),
+              border:
+                  Border.all(color: AppColors.purple.withValues(alpha: 0.35)),
             ),
             child: Text(round,
                 style: AppText.label.copyWith(
@@ -931,75 +1077,145 @@ class _BracketColumn extends StatelessWidget {
                 maxLines: 2),
           ),
           if (matches.isEmpty)
-            _BracketSlot(team: null, isWinner: false, label: 'TBD')
+            _BracketMatchCard(
+                match: null, team1: null, team2: null, isDummy: true)
           else
             ...matches.map((m) => Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: Column(children: [
-                    _BracketSlot(
-                        team: _findTeam(m.team1Id),
-                        isWinner: m.winnerId == m.team1Id),
-                    Container(height: 0.5, width: 156, color: AppColors.border),
-                    _BracketSlot(
-                        team: _findTeam(m.team2Id),
-                        isWinner: m.winnerId == m.team2Id),
-                  ]),
+                  child: _BracketMatchCard(
+                    match: m,
+                    team1: _findTeam(m.team1Id),
+                    team2: _findTeam(m.team2Id),
+                  ),
                 )),
         ]),
         if (!isLast)
           const SizedBox(
-            width: 28,
-            height: 40,
+            width: 32,
+            height: 80,
             child: Center(
-              child: Icon(Icons.chevron_right_rounded,
-                  size: 16, color: AppColors.border),
+              child: Icon(AppIcons.chevronRight,
+                  size: 18, color: AppColors.border),
             ),
           ),
       ]);
 }
 
-class _BracketSlot extends StatelessWidget {
-  final TeamModel? team;
+class _BracketMatchCard extends StatelessWidget {
+  final MatchModel? match;
+  final TeamModel? team1;
+  final TeamModel? team2;
+  final bool isDummy;
+  const _BracketMatchCard(
+      {required this.match,
+      required this.team1,
+      required this.team2,
+      this.isDummy = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDone = match?.status == 'completed';
+
+    return Container(
+      width: 168,
+      decoration: BoxDecoration(
+        color: isDone ? AppColors.green.withValues(alpha: 0.04) : AppColors.bg2,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDone
+              ? AppColors.green.withValues(alpha: 0.3)
+              : AppColors.border,
+        ),
+      ),
+      child: Column(children: [
+        if (match?.scheduledAt != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.border))),
+            child: Row(children: [
+              const Icon(AppIcons.clock, size: 10, color: AppColors.textMuted),
+              const SizedBox(width: 4),
+              Text(match!.scheduledAt!,
+                  style: AppText.caption.copyWith(fontSize: 9)),
+            ]),
+          ),
+        _BracketSlotRow(
+          teamName: isDummy ? 'TBD' : (team1?.name ?? 'TBD'),
+          score: match?.score1 ?? 0,
+          isWinner:
+              match != null && match!.winnerId == match!.team1Id && isDone,
+          team: team1,
+        ),
+        Container(height: 0.5, color: AppColors.border),
+        _BracketSlotRow(
+          teamName: isDummy ? 'TBD' : (team2?.name ?? 'TBD'),
+          score: match?.score2 ?? 0,
+          isWinner:
+              match != null && match!.winnerId == match!.team2Id && isDone,
+          team: team2,
+        ),
+      ]),
+    );
+  }
+}
+
+class _BracketSlotRow extends StatelessWidget {
+  final String teamName;
+  final int score;
   final bool isWinner;
-  final String? label;
-  const _BracketSlot({required this.team, required this.isWinner, this.label});
+  final TeamModel? team;
+  const _BracketSlotRow(
+      {required this.teamName,
+      required this.score,
+      required this.isWinner,
+      this.team});
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 156,
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: isWinner ? AppColors.cyan.withOpacity(0.08) : AppColors.bg2,
-          border: Border.all(
-              color: isWinner
-                  ? AppColors.cyan.withOpacity(0.4)
-                  : AppColors.border),
+          color: isWinner
+              ? AppColors.cyan.withValues(alpha: 0.07)
+              : Colors.transparent,
         ),
         child: Row(children: [
           if (team != null) ...[
             TeamAvatar(team: team!, size: 22),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text(
-              team!.name.split(' ').first,
-              style: AppText.caption.copyWith(
-                  color: isWinner
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary),
+            const SizedBox(width: 7),
+          ],
+          if (isWinner)
+            const Padding(
+              padding: EdgeInsets.only(right: 4),
+              child: Icon(AppIcons.trophy, size: 11, color: AppColors.gold),
+            ),
+          Expanded(
+            child: Text(
+              teamName.split(' ').first,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isWinner ? FontWeight.w700 : FontWeight.w400,
+                color:
+                    isWinner ? AppColors.textPrimary : AppColors.textSecondary,
+              ),
               overflow: TextOverflow.ellipsis,
-            )),
-            if (isWinner)
-              const Icon(Icons.emoji_events_rounded,
-                  size: 12, color: AppColors.gold),
-          ] else
-            Text(label ?? 'TBD',
-                style: AppText.caption.copyWith(color: AppColors.textMuted)),
+            ),
+          ),
+          Text(
+            '$score',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: isWinner ? AppColors.green : AppColors.textMuted,
+            ),
+          ),
         ]),
       );
 }
 
 // ─── Standings Tab ────────────────────────────────────────────────────────────
+// Improved: cleaner podium, better table with alternating rows, rank highlight
 class _StandingsTab extends StatelessWidget {
   final TournamentModel tournament;
   const _StandingsTab({required this.tournament});
@@ -1008,17 +1224,32 @@ class _StandingsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (tournament.standings.isEmpty) {
       return const EmptyState(
-          icon: Icons.leaderboard_rounded,
+          icon: AppIcons.leaderboard,
           title: 'No Standings Yet',
           subtitle: 'Standings will appear once matches begin');
     }
 
+    final sorted = List.from(tournament.standings)
+      ..sort((a, b) => (b.points as int).compareTo(a.points as int));
+
+    final top3 = sorted.take(3).toList();
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(children: [
-        // Header
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Podium ─────────────────────────────────
+        if (top3.isNotEmpty) ...[
+          _SectionLabel(text: 'TOP PERFORMERS', icon: AppIcons.trophy),
+          _ImprovedPodiumRow(top3: top3),
+          const SizedBox(height: 28),
+        ],
+
+        // ── Table header ───────────────────────────
+        _SectionLabel(text: 'FULL STANDINGS', icon: AppIcons.leaderboard),
+
+        // Column headers
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: AppColors.bg2,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
@@ -1029,116 +1260,356 @@ class _StandingsTab extends StatelessWidget {
             ),
           ),
           child: Row(children: [
-            const SizedBox(width: 32),
+            const SizedBox(width: 36),
             const Expanded(
                 child: Text('TEAM',
                     style: TextStyle(
-                        fontFamily: 'Rajdhani',
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textMuted,
                         letterSpacing: 1.5))),
-            for (final label in ['P', 'W', 'L', 'PTS'])
+            for (final col in [
+              ('P', false),
+              ('W', false),
+              ('L', false),
+              ('PTS', true),
+            ])
               SizedBox(
-                width: label == 'PTS' ? 44 : 30,
-                child: Text(label,
+                width: col.$2 ? 48 : 32,
+                child: Text(col.$1,
                     style: TextStyle(
-                        fontFamily: 'Rajdhani',
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: label == 'PTS'
-                            ? AppColors.cyan
-                            : AppColors.textMuted,
+                        color: col.$2 ? AppColors.cyan : AppColors.textMuted,
                         letterSpacing: 1.5),
                     textAlign: TextAlign.center),
               ),
           ]),
         ),
+
         // Rows
-        ...tournament.standings.asMap().entries.map((e) {
-          final s = e.value;
-          final rank = e.key + 1;
-          final isTop3 = rank <= 3;
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ClipRRect(
+          borderRadius:
+              const BorderRadius.vertical(bottom: Radius.circular(12)),
+          child: Container(
             decoration: BoxDecoration(
-              color: isTop3 ? AppColors.cyan.withOpacity(0.03) : AppColors.bg1,
-              border: const Border(
-                left: BorderSide(color: AppColors.border),
-                right: BorderSide(color: AppColors.border),
-                bottom: BorderSide(color: AppColors.border),
-              ),
+              border: Border.all(color: AppColors.border),
             ),
-            child: Row(children: [
-              SizedBox(width: 32, child: _RankWidget(rank: rank)),
-              Expanded(
-                  child: Row(children: [
-                Container(
-                  width: 28,
-                  height: 28,
+            child: Column(
+              children: sorted.asMap().entries.map((e) {
+                final rank = e.key + 1;
+                final s = e.value;
+                final isTop1 = rank == 1;
+                final isTop3 = rank <= 3;
+                final isEven = e.key % 2 == 0;
+
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
                   decoration: BoxDecoration(
-                    color: AppColors.bg3,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.border),
+                    color: isTop1
+                        ? AppColors.gold.withValues(alpha: 0.04)
+                        : isTop3
+                            ? AppColors.cyan.withValues(alpha: 0.03)
+                            : isEven
+                                ? AppColors.bg1
+                                : AppColors.bg0,
+                    border: e.key < sorted.length - 1
+                        ? const Border(
+                            bottom:
+                                BorderSide(color: AppColors.border, width: 0.5))
+                        : null,
                   ),
-                  child: Center(
-                    child: Text(
-                      s.teamName.length >= 2
-                          ? s.teamName.substring(0, 2)
-                          : s.teamName,
-                      style: AppText.label.copyWith(
-                          color: AppColors.cyan,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 10),
+                  child: Row(children: [
+                    // Rank
+                    SizedBox(
+                      width: 36,
+                      child: _ImprovedRankBadge(rank: rank),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: Text(s.teamName,
-                        style: AppText.bodyMd.copyWith(fontSize: 13),
-                        overflow: TextOverflow.ellipsis)),
-              ])),
-              SizedBox(
-                  width: 30,
-                  child: Text('${s.played}',
-                      style: AppText.body, textAlign: TextAlign.center)),
-              SizedBox(
-                  width: 30,
-                  child: Text('${s.wins}',
-                      style: AppText.body.copyWith(color: AppColors.green),
-                      textAlign: TextAlign.center)),
-              SizedBox(
-                  width: 30,
-                  child: Text('${s.losses}',
-                      style: AppText.body.copyWith(color: AppColors.red),
-                      textAlign: TextAlign.center)),
-              SizedBox(
-                  width: 44,
-                  child: Text('${s.points}',
-                      style: AppText.heading
-                          .copyWith(color: AppColors.cyan, fontSize: 16),
-                      textAlign: TextAlign.center)),
-            ]),
-          );
-        }),
+                    // Team
+                    Expanded(
+                        child: Row(children: [
+                      // Initials badge
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: isTop1
+                              ? AppColors.gold.withValues(alpha: 0.12)
+                              : AppColors.bg3,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: isTop1
+                                  ? AppColors.gold.withValues(alpha: 0.3)
+                                  : AppColors.border),
+                        ),
+                        child: Center(
+                          child: Text(
+                            s.teamName.length >= 2
+                                ? s.teamName.substring(0, 2)
+                                : s.teamName,
+                            style: AppText.label.copyWith(
+                                color: isTop1 ? AppColors.gold : AppColors.cyan,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Text(s.teamName,
+                              style: AppText.bodyMd.copyWith(
+                                  fontSize: 13,
+                                  fontWeight: isTop1
+                                      ? FontWeight.w700
+                                      : FontWeight.w500),
+                              overflow: TextOverflow.ellipsis)),
+                    ])),
+                    // P
+                    SizedBox(
+                        width: 32,
+                        child: Text('${s.played}',
+                            style: AppText.body
+                                .copyWith(color: AppColors.textSecondary),
+                            textAlign: TextAlign.center)),
+                    // W
+                    SizedBox(
+                        width: 32,
+                        child: Text('${s.wins}',
+                            style: AppText.body.copyWith(
+                                color: AppColors.green,
+                                fontWeight: FontWeight.w600),
+                            textAlign: TextAlign.center)),
+                    // L
+                    SizedBox(
+                        width: 32,
+                        child: Text('${s.losses}',
+                            style: AppText.body.copyWith(
+                                color: AppColors.red,
+                                fontWeight: FontWeight.w600),
+                            textAlign: TextAlign.center)),
+                    // PTS
+                    SizedBox(
+                      width: 48,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isTop1
+                              ? AppColors.gold.withValues(alpha: 0.12)
+                              : AppColors.cyan.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text('${s.points}',
+                            style: AppText.heading.copyWith(
+                                color: isTop1 ? AppColors.gold : AppColors.cyan,
+                                fontSize: 14),
+                            textAlign: TextAlign.center),
+                      ),
+                    ),
+                  ]),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
         const SizedBox(height: 20),
       ]),
     );
   }
 }
 
-class _RankWidget extends StatelessWidget {
+// ─── Improved Podium ──────────────────────────────────────────────────────────
+class _ImprovedPodiumRow extends StatelessWidget {
+  final List top3;
+  const _ImprovedPodiumRow({required this.top3});
+
+  @override
+  Widget build(BuildContext context) {
+    final first = top3[0];
+    final second = top3.length > 1 ? top3[1] : null;
+    final third = top3.length > 2 ? top3[2] : null;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bg1,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(children: [
+        // Podium visual
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // 2nd
+            if (second != null)
+              Expanded(
+                  child: _PodiumPillar(
+                entry: second,
+                rank: 2,
+                pillarHeight: 56,
+                accentColor: const Color(0xFFC0C0C0),
+              ))
+            else
+              const Expanded(child: SizedBox()),
+            const SizedBox(width: 6),
+            // 1st — centre, tallest
+            Expanded(
+                child: _PodiumPillar(
+              entry: first,
+              rank: 1,
+              pillarHeight: 80,
+              accentColor: AppColors.gold,
+            )),
+            const SizedBox(width: 6),
+            // 3rd
+            if (third != null)
+              Expanded(
+                  child: _PodiumPillar(
+                entry: third,
+                rank: 3,
+                pillarHeight: 44,
+                accentColor: const Color(0xFFCD7F32),
+              ))
+            else
+              const Expanded(child: SizedBox()),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Podium base bar
+        Row(children: [
+          if (second != null) Expanded(child: _PodiumBase(rank: 2)),
+          const SizedBox(width: 6),
+          Expanded(child: _PodiumBase(rank: 1)),
+          const SizedBox(width: 6),
+          if (third != null) Expanded(child: _PodiumBase(rank: 3)),
+          if (third == null) const Expanded(child: SizedBox()),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _PodiumPillar extends StatelessWidget {
+  final dynamic entry;
   final int rank;
-  const _RankWidget({required this.rank});
+  final double pillarHeight;
+  final Color accentColor;
+  const _PodiumPillar({
+    required this.entry,
+    required this.rank,
+    required this.pillarHeight,
+    required this.accentColor,
+  });
+
+  String get _medal => switch (rank) {
+        1 => '🥇',
+        2 => '🥈',
+        _ => '🥉',
+      };
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(_medal, style: TextStyle(fontSize: rank == 1 ? 26.0 : 20.0)),
+          const SizedBox(height: 6),
+          Text(
+            entry.teamName.split(' ').first,
+            style: AppText.label.copyWith(
+                color: accentColor, fontWeight: FontWeight.w700, fontSize: 11),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              '${entry.points} PTS',
+              style: AppText.label.copyWith(
+                  color: accentColor, fontSize: 9, letterSpacing: 0.5),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Pillar
+          Container(
+            height: pillarHeight,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.08),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(6)),
+              border: Border(
+                top: BorderSide(color: accentColor.withValues(alpha: 0.3)),
+                left: BorderSide(color: accentColor.withValues(alpha: 0.2)),
+                right: BorderSide(color: accentColor.withValues(alpha: 0.2)),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '#$rank',
+                style: TextStyle(
+                    color: accentColor.withValues(alpha: 0.4),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1),
+              ),
+            ),
+          ),
+        ],
+      );
+}
+
+class _PodiumBase extends StatelessWidget {
+  final int rank;
+  const _PodiumBase({required this.rank});
+
+  Color get _color => switch (rank) {
+        1 => AppColors.gold,
+        2 => const Color(0xFFC0C0C0),
+        _ => const Color(0xFFCD7F32),
+      };
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 6,
+        decoration: BoxDecoration(
+          color: _color.withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(3),
+          border: Border.all(color: _color.withValues(alpha: 0.4)),
+        ),
+      );
+}
+
+class _ImprovedRankBadge extends StatelessWidget {
+  final int rank;
+  const _ImprovedRankBadge({required this.rank});
 
   @override
   Widget build(BuildContext context) {
     if (rank == 1) return const Text('🥇', style: TextStyle(fontSize: 18));
     if (rank == 2) return const Text('🥈', style: TextStyle(fontSize: 18));
     if (rank == 3) return const Text('🥉', style: TextStyle(fontSize: 18));
-    return Text('$rank',
-        style: AppText.body.copyWith(color: AppColors.textMuted));
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: AppColors.bg3,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Center(
+        child: Text('$rank',
+            style: AppText.label
+                .copyWith(color: AppColors.textMuted, fontSize: 11)),
+      ),
+    );
   }
 }
 
@@ -1185,11 +1656,12 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_submitted)
+    if (_submitted) {
       return _SuccessScreen(
           tournament: widget.tournament,
           teamName: _teamNameCtrl.text,
           teamTag: _teamTagCtrl.text);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.bg0,
@@ -1207,7 +1679,7 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.border),
             ),
-            child: const Icon(Icons.arrow_back_ios_rounded,
+            child: const Icon(AppIcons.back,
                 size: 15, color: AppColors.textSecondary),
           ),
         ),
@@ -1229,7 +1701,6 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
       body: Form(
         key: _formKey,
         child: Column(children: [
-          // Step indicator
           _StepHeader(
             steps: _steps,
             currentStep: _currentStep,
@@ -1237,7 +1708,6 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
               if (i <= _currentStep) setState(() => _currentStep = i);
             },
           ),
-          // Content
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
@@ -1247,7 +1717,6 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
               ),
             ),
           ),
-          // Navigation
           _FormNavigation(
             currentStep: _currentStep,
             totalSteps: _steps.length,
@@ -1339,7 +1808,7 @@ class _StepProgress extends StatelessWidget {
   }
 }
 
-// ─── Step Header ─────────────────────────────────────────────────────────────
+// ─── Step Header ──────────────────────────────────────────────────────────────
 class _StepHeader extends StatelessWidget {
   final List<String> steps;
   final int currentStep;
@@ -1388,7 +1857,7 @@ class _StepHeader extends StatelessWidget {
                   ),
                   child: Center(
                     child: isDone
-                        ? const Icon(Icons.check_rounded,
+                        ? const Icon(Icons.check,
                             size: 12, color: AppColors.bg0)
                         : Text('${idx + 1}',
                             style: AppText.label.copyWith(
@@ -1450,7 +1919,7 @@ class _FormNavigation extends StatelessWidget {
                 ),
                 child:
                     Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  const Icon(Icons.arrow_back_rounded,
+                  const Icon(AppIcons.back,
                       size: 16, color: AppColors.textSecondary),
                   const SizedBox(width: 6),
                   Text('BACK',
@@ -1472,7 +1941,7 @@ class _FormNavigation extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.cyan.withOpacity(0.25),
+                    color: AppColors.cyan.withValues(alpha: 0.25),
                     blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
@@ -1485,7 +1954,7 @@ class _FormNavigation extends StatelessWidget {
                         .copyWith(color: AppColors.bg0, letterSpacing: 1.5)),
                 const SizedBox(width: 6),
                 Icon(
-                  isLast ? Icons.send_rounded : Icons.arrow_forward_rounded,
+                  isLast ? AppIcons.send : AppIcons.arrowFwd,
                   size: 16,
                   color: AppColors.bg0,
                 ),
@@ -1523,7 +1992,7 @@ class _Step1TeamIdentity extends StatelessWidget {
             label: 'TEAM NAME',
             controller: teamNameCtrl,
             hint: 'Full official team name',
-            icon: Icons.groups_rounded,
+            icon: AppIcons.team,
             isRequired: true,
           ),
           const SizedBox(height: 16),
@@ -1531,7 +2000,7 @@ class _Step1TeamIdentity extends StatelessWidget {
             label: 'TEAM TAG',
             hint: 'e.g. T1, NAVI, SEN',
             controller: teamTagCtrl,
-            icon: Icons.tag_rounded,
+            icon: AppIcons.tag,
             isRequired: true,
             maxLength: 5,
             allCaps: true,
@@ -1563,7 +2032,7 @@ class _Step2Management extends StatelessWidget {
             label: 'FOUNDER / OWNER NAME',
             hint: 'Legal full name',
             controller: founderNameCtrl,
-            icon: Icons.person_rounded,
+            icon: AppIcons.person,
             isRequired: true,
           ),
           const SizedBox(height: 16),
@@ -1571,7 +2040,7 @@ class _Step2Management extends StatelessWidget {
             label: 'CONTACT EMAIL',
             hint: 'manager@team.gg',
             controller: contactEmailCtrl,
-            icon: Icons.email_rounded,
+            icon: AppIcons.email,
             isRequired: true,
           ),
           const SizedBox(height: 16),
@@ -1579,7 +2048,7 @@ class _Step2Management extends StatelessWidget {
             label: 'PHONE / DISCORD',
             hint: '+1 234 567 8900 or User#0000',
             controller: contactPhoneCtrl,
-            icon: Icons.phone_rounded,
+            icon: AppIcons.phone,
             isRequired: true,
           ),
           const SizedBox(height: 24),
@@ -1620,10 +2089,9 @@ class _Step3Coaching extends StatelessWidget {
       );
 }
 
-// ─── Step 4: Player Roster (Dynamic & Flexible) ───────────────────────────────
+// ─── Step 4: Player Roster ────────────────────────────────────────────────────
 class _Step4Roster extends StatefulWidget {
   final VoidCallback onUpload;
-
   const _Step4Roster({super.key, required this.onUpload});
 
   @override
@@ -1631,13 +2099,11 @@ class _Step4Roster extends StatefulWidget {
 }
 
 class _Step4RosterState extends State<_Step4Roster> {
-  // Local state management tracking list of active player/sub entries dynamically
   final List<_DynamicPlayerItem> _roster = [];
 
   @override
   void initState() {
     super.initState();
-    // Start with 1 default entry (Captain) to prompt the user immediately
     _addNewPlayer(isFirst: true);
   }
 
@@ -1659,9 +2125,7 @@ class _Step4RosterState extends State<_Step4Roster> {
   }
 
   void _removePlayer(int index) {
-    setState(() {
-      _roster.removeAt(index);
-    });
+    setState(() => _roster.removeAt(index));
   }
 
   @override
@@ -1682,31 +2146,25 @@ class _Step4RosterState extends State<_Step4Roster> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Rules Banner
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.cyan.withOpacity(0.06),
+            color: AppColors.cyan.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.cyan.withOpacity(0.2)),
+            border: Border.all(color: AppColors.cyan.withValues(alpha: 0.2)),
           ),
-          child: Row(
-            children: [
-              const Icon(Icons.info_outline_rounded,
-                  size: 16, color: AppColors.cyan),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'All active players and substitutes must provide details matching their official National ID or Passport.',
-                  style: AppText.caption.copyWith(height: 1.5),
-                ),
+          child: Row(children: [
+            const Icon(AppIcons.info, size: 16, color: AppColors.cyan),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'All active players and substitutes must provide details matching their official National ID or Passport.',
+                style: AppText.caption.copyWith(height: 1.5),
               ),
-            ],
-          ),
+            ),
+          ]),
         ),
         const SizedBox(height: 20),
-
-        // Roster Dynamic List Builder
         if (_roster.isEmpty)
           Container(
             width: double.infinity,
@@ -1740,7 +2198,6 @@ class _Step4RosterState extends State<_Step4Roster> {
                 },
                 onToggleCaptain: (isCaptainValue) {
                   setState(() {
-                    // Reset all other captains if this one becomes captain
                     if (isCaptainValue) {
                       for (var p in _roster) {
                         p.isCaptain = false;
@@ -1754,8 +2211,6 @@ class _Step4RosterState extends State<_Step4Roster> {
             },
           ),
         const SizedBox(height: 12),
-
-        // ADD NEW PLAYER BUTTON
         GestureDetector(
           onTap: () => _addNewPlayer(),
           child: Container(
@@ -1764,13 +2219,12 @@ class _Step4RosterState extends State<_Step4Roster> {
             decoration: BoxDecoration(
               color: AppColors.bg3,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
+              border: Border.all(color: AppColors.cyan.withValues(alpha: 0.3)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.person_add_rounded,
-                    color: AppColors.cyan, size: 18),
+                const Icon(AppIcons.personAdd, color: AppColors.cyan, size: 18),
                 const SizedBox(width: 8),
                 Text(
                   'ADD NEW PLAYER / SUBSTITUTE',
@@ -1786,7 +2240,6 @@ class _Step4RosterState extends State<_Step4Roster> {
   }
 }
 
-// Helper Object model to track controllers locally in Step 4
 class _DynamicPlayerItem {
   final TextEditingController fullNameCtrl;
   final TextEditingController ignCtrl;
@@ -1809,7 +2262,7 @@ class _DynamicPlayerItem {
   });
 }
 
-// ─── Shared/Internal form sub-components ───────────────────────────────────────
+// ─── Shared form sub-components ───────────────────────────────────────────────
 class _PersonCard extends StatelessWidget {
   final String title;
   final TextEditingController controller;
@@ -1845,38 +2298,36 @@ class _PersonCard extends StatelessWidget {
               label: 'FULL NAME',
               hint: 'Legal full name',
               controller: controller,
-              icon: Icons.person_outline_rounded,
+              icon: AppIcons.person,
               isRequired: false,
             ),
             const SizedBox(height: 12),
             _FormField(
               label: 'NICKNAME / ALIAS',
               hint: 'e.g. kkOma',
-              icon: Icons.gamepad_rounded,
+              icon: AppIcons.gamepad,
               isRequired: false,
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _FormField(
-                    label: 'NATIONALITY',
-                    hint: 'e.g. KR',
-                    icon: Icons.flag_rounded,
-                    isRequired: false,
-                  ),
+            Row(children: [
+              Expanded(
+                child: _FormField(
+                  label: 'NATIONALITY',
+                  hint: 'e.g. KR',
+                  icon: AppIcons.flag,
+                  isRequired: false,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _FormField(
-                    label: 'DATE OF BIRTH',
-                    hint: 'YYYY-MM-DD',
-                    icon: Icons.calendar_today_rounded,
-                    isRequired: false,
-                  ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _FormField(
+                  label: 'DATE OF BIRTH',
+                  hint: 'YYYY-MM-DD',
+                  icon: AppIcons.calendar,
+                  isRequired: false,
                 ),
-              ],
-            ),
+              ),
+            ]),
             const SizedBox(height: 16),
             _UploadRect(label: 'UPLOAD $title ID', onTap: onUpload),
           ],
@@ -1914,124 +2365,101 @@ class _PlayerEntryForm extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: item.isCaptain
-              ? AppColors.cyan.withOpacity(0.4)
+              ? AppColors.cyan.withValues(alpha: 0.4)
               : AppColors.border,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Actions Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  if (item.isCaptain)
-                    const Icon(Icons.military_tech_rounded,
-                        size: 16, color: AppColors.purple),
-                  if (item.isCaptain) const SizedBox(width: 5),
-                  Text(
-                    'MEMBER #${index + 1} ($positionLabel)',
-                    style: AppText.label.copyWith(
-                      color: item.isCaptain
-                          ? AppColors.cyan
-                          : AppColors.textSecondary,
-                      fontSize: 11,
-                      letterSpacing: 1.2,
-                    ),
+              Row(children: [
+                if (item.isCaptain)
+                  const Icon(AppIcons.medal, size: 16, color: AppColors.purple),
+                if (item.isCaptain) const SizedBox(width: 5),
+                Text(
+                  'MEMBER #${index + 1} ($positionLabel)',
+                  style: AppText.label.copyWith(
+                    color: item.isCaptain
+                        ? AppColors.cyan
+                        : AppColors.textSecondary,
+                    fontSize: 11,
+                    letterSpacing: 1.2,
                   ),
-                ],
-              ),
+                ),
+              ]),
               GestureDetector(
                 onTap: onRemove,
-                child: const Icon(Icons.delete_outline_rounded,
-                    color: AppColors.red, size: 18),
+                child:
+                    const Icon(AppIcons.delete, color: AppColors.red, size: 18),
               ),
             ],
           ),
           const SizedBox(height: 14),
-
-          // Full Name
           _ThemedInput(
               hint: 'Legal Full Name',
-              icon: Icons.badge_rounded,
+              icon: AppIcons.badge,
               controller: item.fullNameCtrl),
           const SizedBox(height: 12),
-
-          // IGN & Game UID (Side by Side)
-          Row(
-            children: [
-              Expanded(
-                child: _ThemedInput(
-                    hint: 'In-Game Name (IGN)',
-                    icon: Icons.gamepad_rounded,
-                    controller: item.ignCtrl),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ThemedInput(
-                    hint: 'Game UID',
-                    icon: Icons.tag_rounded,
-                    controller: item.uidCtrl),
-              ),
-            ],
-          ),
+          Row(children: [
+            Expanded(
+              child: _ThemedInput(
+                  hint: 'In-Game Name (IGN)',
+                  icon: AppIcons.gamepad,
+                  controller: item.ignCtrl),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ThemedInput(
+                  hint: 'Game UID',
+                  icon: AppIcons.tag,
+                  controller: item.uidCtrl),
+            ),
+          ]),
           const SizedBox(height: 12),
-
-          // Nationality & DOB (Side by Side)
-          Row(
-            children: [
-              Expanded(
-                child: _ThemedInput(
-                    hint: 'Nationality',
-                    icon: Icons.flag_rounded,
-                    controller: item.nationalityCtrl),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ThemedInput(
-                    hint: 'DOB (YYYY-MM-DD)',
-                    icon: Icons.calendar_today_rounded,
-                    controller: item.dobCtrl),
-              ),
-            ],
-          ),
+          Row(children: [
+            Expanded(
+              child: _ThemedInput(
+                  hint: 'Nationality',
+                  icon: AppIcons.flag,
+                  controller: item.nationalityCtrl),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ThemedInput(
+                  hint: 'DOB (YYYY-MM-DD)',
+                  icon: AppIcons.calendar,
+                  controller: item.dobCtrl),
+            ),
+          ]),
           const SizedBox(height: 12),
-
-          // In-Game Role
           _ThemedInput(
               hint: 'In-Game Role (e.g. Support, IGL, Duelist)',
-              icon: Icons.sports_esports_rounded,
+              icon: AppIcons.gamepad,
               controller: item.roleCtrl),
           const SizedBox(height: 14),
-
-          // Toggles Tiers Controls
-          Row(
-            children: [
-              // Position Toggle (Main vs Sub)
-              Text('Substitute:',
-                  style:
-                      AppText.caption.copyWith(color: AppColors.textSecondary)),
-              Switch.adaptive(
-                value: item.isSub,
-                activeColor: AppColors.cyan,
-                onChanged: onTogglePosition,
-              ),
-              const Spacer(),
-              // Captain Toggle
-              Text('Team Captain:',
-                  style:
-                      AppText.caption.copyWith(color: AppColors.textSecondary)),
-              Switch.adaptive(
-                value: item.isCaptain,
-                activeColor: AppColors.purple,
-                onChanged: onToggleCaptain,
-              ),
-            ],
-          ),
+          Row(children: [
+            Text('Substitute:',
+                style:
+                    AppText.caption.copyWith(color: AppColors.textSecondary)),
+            Switch.adaptive(
+              value: item.isSub,
+              activeThumbColor: AppColors.cyan,
+              onChanged: onTogglePosition,
+            ),
+            const Spacer(),
+            Text('Team Captain:',
+                style:
+                    AppText.caption.copyWith(color: AppColors.textSecondary)),
+            Switch.adaptive(
+              value: item.isCaptain,
+              activeThumbColor: AppColors.purple,
+              onChanged: onToggleCaptain,
+            ),
+          ]),
           const SizedBox(height: 12),
-
           _UploadRect(label: 'PLAYER ID / PASSPORT', onTap: onUpload),
         ],
       ),
@@ -2094,17 +2522,15 @@ class _FormField extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(label,
-                  style:
-                      AppText.label.copyWith(fontSize: 11, letterSpacing: 1.2)),
-              if (!isRequired)
-                Text('  optional',
-                    style: AppText.caption
-                        .copyWith(color: AppColors.textMuted, fontSize: 10)),
-            ],
-          ),
+          Row(children: [
+            Text(label,
+                style:
+                    AppText.label.copyWith(fontSize: 11, letterSpacing: 1.2)),
+            if (!isRequired)
+              Text('  optional',
+                  style: AppText.caption
+                      .copyWith(color: AppColors.textMuted, fontSize: 10)),
+          ]),
           const SizedBox(height: 8),
           TextFormField(
             controller: controller ?? TextEditingController(),
@@ -2147,34 +2573,31 @@ class _UploadCircle extends StatelessWidget {
       {required this.size, required this.label, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          GestureDetector(
-            onTap: onTap,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                color: AppColors.bg3,
-                shape: BoxShape.circle,
-              ),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add_a_photo_rounded,
-                      color: AppColors.textSecondary, size: 24),
-                ],
-              ),
+  Widget build(BuildContext context) => Column(children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: const BoxDecoration(
+              color: AppColors.bg3,
+              shape: BoxShape.circle,
+            ),
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(AppIcons.photo, color: AppColors.textSecondary, size: 24),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: AppText.label.copyWith(
-                fontSize: 10, letterSpacing: 1, color: AppColors.textSecondary),
-          ),
-        ],
-      );
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: AppText.label.copyWith(
+              fontSize: 10, letterSpacing: 1, color: AppColors.textSecondary),
+        ),
+      ]);
 }
 
 class _UploadRect extends StatelessWidget {
@@ -2202,7 +2625,7 @@ class _UploadRect extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.upload_file_rounded,
+                  const Icon(AppIcons.upload,
                       color: AppColors.textSecondary, size: 20),
                   const SizedBox(width: 8),
                   Text('Tap to upload',
@@ -2241,12 +2664,12 @@ class _SuccessScreen extends StatelessWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: AppColors.cyan.withOpacity(0.12),
+                    color: AppColors.cyan.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: AppColors.cyan.withOpacity(0.4), width: 2),
+                        color: AppColors.cyan.withValues(alpha: 0.4), width: 2),
                   ),
-                  child: const Icon(Icons.check_rounded,
+                  child: const Icon(AppIcons.check,
                       color: AppColors.cyan, size: 36),
                 ),
                 const SizedBox(height: 28),
@@ -2278,19 +2701,17 @@ class _SuccessScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.hourglass_top_rounded,
-                          size: 16, color: AppColors.purple),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Your roster is pending review by the tournament organizers.',
-                          style: AppText.caption.copyWith(height: 1.5),
-                        ),
+                  child: Row(children: [
+                    const Icon(AppIcons.hourglass,
+                        size: 16, color: AppColors.purple),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Your roster is pending review by the tournament organizers.',
+                        style: AppText.caption.copyWith(height: 1.5),
                       ),
-                    ],
-                  ),
+                    ),
+                  ]),
                 ),
                 const SizedBox(height: 36),
                 GestureDetector(
@@ -2316,4 +2737,121 @@ class _SuccessScreen extends StatelessWidget {
           ),
         ),
       );
+}
+
+// ─── Tournament List Screen Filter Tabs (ALL / LIVE / OPEN / UPCOMING) ────────
+// Drop this widget into your tournament list/home screen where you have
+// the existing filter tabs (All, Open, Upcoming). Replace those tabs with this.
+class TournamentFilterTabs extends StatefulWidget {
+  final ValueChanged<TournamentFilterType> onFilterChanged;
+  final TournamentFilterType initialFilter;
+  const TournamentFilterTabs({
+    super.key,
+    required this.onFilterChanged,
+    this.initialFilter = TournamentFilterType.all,
+  });
+
+  @override
+  State<TournamentFilterTabs> createState() => _TournamentFilterTabsState();
+}
+
+enum TournamentFilterType { all, live, open, upcoming }
+
+class _TournamentFilterTabsState extends State<TournamentFilterTabs> {
+  late TournamentFilterType _selected;
+
+  static const _filters = [
+    (TournamentFilterType.all, 'ALL', null),
+    (TournamentFilterType.live, 'LIVE', AppIcons.live),
+    (TournamentFilterType.open, 'OPEN', AppIcons.add),
+    (TournamentFilterType.upcoming, 'UPCOMING', AppIcons.clock),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initialFilter;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: _filters.map((f) {
+          final (type, label, icon) = f;
+          final isSelected = _selected == type;
+          final isLive = type == TournamentFilterType.live;
+
+          // Live tab gets a pulsing red dot accent
+          final accentColor = isLive ? AppColors.red : AppColors.cyan;
+
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _selected = type);
+              widget.onFilterChanged(type);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? accentColor.withValues(alpha: 0.12)
+                    : AppColors.bg2,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? accentColor.withValues(alpha: 0.5)
+                      : AppColors.border,
+                  width: isSelected ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    // Live dot pulses with opacity animation handled by OS
+                    Icon(
+                      icon,
+                      size: isLive ? 8 : 11,
+                      color: isSelected ? accentColor : AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 5),
+                  ],
+                  Text(
+                    label,
+                    style: AppText.label.copyWith(
+                        fontSize: 11,
+                        letterSpacing: 1.2,
+                        color: isSelected ? accentColor : AppColors.textMuted,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ─── Helper: filter tournaments by type ───────────────────────────────────────
+extension TournamentFilter on List<TournamentModel> {
+  List<TournamentModel> filterBy(TournamentFilterType type) {
+    return switch (type) {
+      TournamentFilterType.all => this,
+      TournamentFilterType.live =>
+        where((t) => t.status == TournamentStatus.ongoing).toList(),
+      TournamentFilterType.open =>
+        where((t) => t.status == TournamentStatus.registration).toList(),
+      TournamentFilterType.upcoming =>
+        where((t) => t.status == TournamentStatus.upcoming).toList(),
+    };
+  }
 }

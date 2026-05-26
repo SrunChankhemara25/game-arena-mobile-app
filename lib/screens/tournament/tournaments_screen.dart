@@ -11,21 +11,15 @@ class TournamentsScreen extends StatefulWidget {
   State<TournamentsScreen> createState() => _TournamentsScreenState();
 }
 
-class _TournamentsScreenState extends State<TournamentsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tab;
+// REMOVED SingleTickerProviderStateMixin — DefaultTabController handles this now!
+class _TournamentsScreenState extends State<TournamentsScreen> {
   final _search = TextEditingController();
   GameTitle? _gameFilter;
 
-  @override
-  void initState() {
-    super.initState();
-    _tab = TabController(length: 3, vsync: this);
-  }
+  // No more manual TabController to initialize!
 
   @override
   void dispose() {
-    _tab.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -33,18 +27,24 @@ class _TournamentsScreenState extends State<TournamentsScreen>
   List<TournamentModel> _getFiltered(TournamentStatus? status) {
     var list = MockData.tournaments;
     if (status != null) list = list.where((t) => t.status == status).toList();
-    if (_gameFilter != null)
+    if (_gameFilter != null) {
       list = list.where((t) => t.game == _gameFilter).toList();
-    if (_search.text.isNotEmpty)
+    }
+    if (_search.text.isNotEmpty) {
       list = list
           .where(
               (t) => t.title.toLowerCase().contains(_search.text.toLowerCase()))
           .toList();
+    }
     return list;
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    // ── FIX: Wrapping the Scaffold in DefaultTabController prevents Hot Reload crashes! ──
+    return DefaultTabController(
+      length: 4, // Exactly 4 tabs
+      child: Scaffold(
         backgroundColor: AppColors.bg0,
         appBar: AppBar(
           backgroundColor: AppColors.bg0,
@@ -57,7 +57,7 @@ class _TournamentsScreenState extends State<TournamentsScreen>
                 onPressed: _showFilterSheet),
           ],
           bottom: TabBar(
-            controller: _tab,
+            // controller: _tab, <-- Removed! DefaultTabController links it automatically.
             indicatorColor: AppColors.cyan,
             labelStyle:
                 AppText.btnSm.copyWith(color: AppColors.cyan, fontSize: 12),
@@ -65,6 +65,7 @@ class _TournamentsScreenState extends State<TournamentsScreen>
                 .copyWith(color: AppColors.textMuted, fontSize: 12),
             tabs: const [
               Tab(text: 'ALL'),
+              Tab(text: 'LIVE'),
               Tab(text: 'OPEN'),
               Tab(text: 'UPCOMING'),
             ],
@@ -78,18 +79,23 @@ class _TournamentsScreenState extends State<TournamentsScreen>
                   hint: 'Search tournaments...',
                   onChanged: (_) => setState(() {}))),
           Expanded(
-              child: TabBarView(
-            controller: _tab,
-            children: [
-              _TournamentList(tournaments: _getFiltered(null)),
-              _TournamentList(
-                  tournaments: _getFiltered(TournamentStatus.registration)),
-              _TournamentList(
-                  tournaments: _getFiltered(TournamentStatus.upcoming)),
-            ],
-          )),
+            child: TabBarView(
+              // controller: _tab, <-- Removed! DefaultTabController links it automatically.
+              children: [
+                _TournamentList(tournaments: _getFiltered(null)),
+                _TournamentList(
+                    tournaments: _getFiltered(TournamentStatus.ongoing)),
+                _TournamentList(
+                    tournaments: _getFiltered(TournamentStatus.registration)),
+                _TournamentList(
+                    tournaments: _getFiltered(TournamentStatus.upcoming)),
+              ],
+            ),
+          ),
         ]),
-      );
+      ),
+    );
+  }
 
   void _showFilterSheet() => showModalBottomSheet(
         context: context,
@@ -158,11 +164,12 @@ class _TournamentList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tournaments.isEmpty)
+    if (tournaments.isEmpty) {
       return const EmptyState(
           icon: Icons.emoji_events_outlined,
           title: 'No Tournaments',
           subtitle: 'No tournaments available in this category');
+    }
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: tournaments.length,

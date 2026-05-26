@@ -24,6 +24,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   late final AnimationController _entranceCtrl;
   late final AnimationController _pulseCtrl;
 
+  // Mutable alerts state to handle read, archive, unarchive, and deletion live
+  late List<Map<String, dynamic>> _alerts;
+
   final _user = const UserModel(
     id: 'u1',
     name: 'Srun Chankhemara',
@@ -36,6 +39,50 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   void initState() {
     super.initState();
+
+    _alerts = [
+      {
+        'id': '1',
+        'icon': Icons.check_circle_rounded,
+        'color': AppColors.green,
+        'title': 'Team Approved',
+        'body': 'NEXUS GAMING is approved for MPL KH Season 8.',
+        'time': '1h ago',
+        'read': false,
+        'archived': false,
+      },
+      {
+        'id': '2',
+        'icon': Icons.schedule_rounded,
+        'color': AppColors.cyan,
+        'title': 'Match Scheduled',
+        'body': 'vs PHOENIX ESPORTS — Jun 22, 14:00 GMT+7.',
+        'time': '2h ago',
+        'read': false,
+        'archived': false,
+      },
+      {
+        'id': '3',
+        'icon': Icons.notifications_rounded,
+        'color': AppColors.gold,
+        'title': 'Registration Closing',
+        'body': 'PUBG Mobile Open KH closes in 3 days.',
+        'time': '1d ago',
+        'read': true,
+        'archived': false,
+      },
+      {
+        'id': '4',
+        'icon': Icons.military_tech_rounded,
+        'color': AppColors.magenta,
+        'title': 'Match Result',
+        'body': 'NEXUS GAMING won 2–0 vs PHOENIX ESPORTS.',
+        'time': '3d ago',
+        'read': true,
+        'archived': false,
+      },
+    ];
+
     _entranceCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -54,8 +101,110 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
+  // Helper logic to view notification details
+  void _showAlertDetails(Map<String, dynamic> alert) {
+    HapticFeedback.lightImpact();
+    // Automatically mark as read when opened
+    setState(() {
+      alert['read'] = true;
+    });
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bg1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        title: Row(
+          children: [
+            Icon(alert['icon'] as IconData,
+                color: alert['color'] as Color, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                alert['title'] as String,
+                style: AppText.heading.copyWith(color: AppColors.textPrimary),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              alert['body'] as String,
+              style: AppText.body
+                  .copyWith(color: AppColors.textSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Received ${alert['time']}',
+              style: AppText.caption.copyWith(color: AppColors.textMuted),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close',
+                style: AppText.bodyMd.copyWith(color: AppColors.cyan)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Double check modal before permanent deletion
+  void _confirmDeleteAlert(Map<String, dynamic> alert) {
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bg1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        title: Text('Delete Notification',
+            style: AppText.heading.copyWith(color: AppColors.textPrimary)),
+        content: Text(
+          'Are you sure you want to permanently delete this notification? This action cannot be undone.',
+          style: AppText.body
+              .copyWith(color: AppColors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel',
+                style: AppText.bodyMd.copyWith(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _alerts.removeWhere((item) => item['id'] == alert['id']);
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notification deleted.')),
+              );
+            },
+            child: Text('Delete',
+                style: AppText.bodyMd.copyWith(color: AppColors.textPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final activeAlerts =
+        _alerts.where((a) => !(a['archived'] as bool)).toList();
+    final archivedAlerts = _alerts.where((a) => a['archived'] as bool).toList();
+
     return Scaffold(
       backgroundColor: AppColors.bg0,
       body: Stack(
@@ -98,87 +247,123 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
 
-          // ── Main content ─────────────────────────────────────────────
-          SafeArea(
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // ── Top bar ──────────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _buildTopBar(context),
-                ),
+          // ── Main content (Edge-to-Edge scrolling) ───────────────────
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            slivers: [
+              SliverToBoxAdapter(
+                child: _buildTopBar(context),
+              ),
 
-                // ── Identity Block ────────────────────────────────────
+              // Identity Block
+              SliverToBoxAdapter(
+                child: _IdentityBlock(
+                  user: _user,
+                  isAdmin: widget.isAdmin,
+                  pulseCtrl: _pulseCtrl,
+                  entranceCtrl: _entranceCtrl,
+                  onAdminTap: () {
+                    HapticFeedback.mediumImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              const admin_dashboard.AdminDashboard()),
+                    );
+                  },
+                ),
+              ),
+
+              // Section: Active Alerts
+              SliverToBoxAdapter(
+                child: _SectionLabel(
+                  label: 'ALERTS',
+                  tag: activeAlerts.length.toString(),
+                  tagColor: AppColors.cyan,
+                  entranceCtrl: _entranceCtrl,
+                  delay: 0.4,
+                ),
+              ),
+              if (activeAlerts.isEmpty)
                 SliverToBoxAdapter(
-                  child: _IdentityBlock(
-                    user: _user,
-                    isAdmin: widget.isAdmin,
-                    pulseCtrl: _pulseCtrl,
-                    entranceCtrl: _entranceCtrl,
-                    onAdminTap: () {
-                      HapticFeedback.mediumImpact();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                const admin_dashboard.AdminDashboard()),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 24, horizontal: 24),
+                    child: Center(
+                      child: Text('No active notifications',
+                          style: AppText.caption
+                              .copyWith(color: AppColors.textMuted)),
+                    ),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) {
+                      final alert = activeAlerts[i];
+                      return _AlertRow(
+                        key: ValueKey(alert['id']),
+                        data: alert,
+                        index: i,
+                        entranceCtrl: _entranceCtrl,
+                        onTap: () => _showAlertDetails(alert),
+                        onMenuSelected: (action) {
+                          if (action == 'read') {
+                            setState(() => alert['read'] = true);
+                          } else if (action == 'archive') {
+                            setState(() => alert['archived'] = true);
+                          } else if (action == 'delete') {
+                            _confirmDeleteAlert(alert);
+                          }
+                        },
                       );
                     },
+                    childCount: activeAlerts.length,
                   ),
                 ),
 
-                // ── Stats strip ───────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _StatsStrip(entranceCtrl: _entranceCtrl),
-                ),
-
-                // ── Section: Tournaments ──────────────────────────────
+              // Section: Archived Alerts
+              if (archivedAlerts.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _SectionLabel(
-                    label: 'TOURNAMENTS',
-                    tag: '${MockData.tournaments.take(3).length}',
+                    label: 'ARCHIVED',
+                    tag: archivedAlerts.length.toString(),
+                    tagColor: AppColors.textMuted,
                     entranceCtrl: _entranceCtrl,
-                    delay: 0.3,
+                    delay: 0.6,
                   ),
                 ),
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, i) {
-                      final t = MockData.tournaments.take(3).toList()[i];
-                      return _TournamentRow(
-                        tournament: t,
-                        index: i,
+                      final alert = archivedAlerts[i];
+                      return _AlertRow(
+                        key: ValueKey(alert['id']),
+                        data: alert,
+                        index: i + activeAlerts.length,
                         entranceCtrl: _entranceCtrl,
+                        onTap: () => _showAlertDetails(alert),
+                        onMenuSelected: (action) {
+                          if (action == 'unarchive') {
+                            setState(() => alert['archived'] = false);
+                          } else if (action == 'delete') {
+                            _confirmDeleteAlert(alert);
+                          }
+                        },
                       );
                     },
-                    childCount: math.min(3, MockData.tournaments.length),
+                    childCount: archivedAlerts.length,
                   ),
                 ),
-
-                // ── Section: Alerts ───────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _SectionLabel(
-                    label: 'ALERTS',
-                    tag: '2',
-                    tagColor: AppColors.red,
-                    entranceCtrl: _entranceCtrl,
-                    delay: 0.5,
-                  ),
-                ),
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => _AlertRow(
-                      data: _alerts[i],
-                      index: i,
-                      entranceCtrl: _entranceCtrl,
-                    ),
-                    childCount: _alerts.length,
-                  ),
-                ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 120)),
               ],
-            ),
+
+              SliverToBoxAdapter(
+                child: SizedBox(
+                    height: 120 + MediaQuery.of(context).padding.bottom),
+              ),
+            ],
           ),
         ],
       ),
@@ -186,12 +371,13 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildTopBar(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 20, 0),
+      padding: EdgeInsets.fromLTRB(24, topPad + 16, 20, 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Brutalist title — thick stroke left bar
           Container(
             width: 4,
             height: 28,
@@ -225,41 +411,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
     );
   }
-
-  static const _alerts = [
-    {
-      'icon': Icons.check_circle_rounded,
-      'color': AppColors.green,
-      'title': 'Team Approved',
-      'body': 'NEXUS GAMING is approved for MPL KH Season 8.',
-      'time': '1h ago',
-      'read': false,
-    },
-    {
-      'icon': Icons.schedule_rounded,
-      'color': AppColors.cyan,
-      'title': 'Match Scheduled',
-      'body': 'vs PHOENIX ESPORTS — Jun 22, 14:00 GMT+7.',
-      'time': '2h ago',
-      'read': false,
-    },
-    {
-      'icon': Icons.notifications_rounded,
-      'color': AppColors.gold,
-      'title': 'Registration Closing',
-      'body': 'PUBG Mobile Open KH closes in 3 days.',
-      'time': '1d ago',
-      'read': true,
-    },
-    {
-      'icon': Icons.military_tech_rounded,
-      'color': AppColors.magenta,
-      'title': 'Match Result',
-      'body': 'NEXUS GAMING won 2–0 vs PHOENIX ESPORTS.',
-      'time': '3d ago',
-      'read': true,
-    },
-  ];
 }
 
 // ─── Identity Block ───────────────────────────────────────────────────────────
@@ -292,7 +443,6 @@ class _IdentityBlock extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // ── Main card ──────────────────────────────────────────
             Container(
               decoration: BoxDecoration(
                 color: AppColors.bg1,
@@ -302,7 +452,6 @@ class _IdentityBlock extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Top accent strip ────────────────────────────
                   Container(
                     height: 4,
                     decoration: BoxDecoration(
@@ -316,17 +465,14 @@ class _IdentityBlock extends StatelessWidget {
                           const BorderRadius.vertical(top: Radius.circular(24)),
                     ),
                   ),
-
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── Avatar + name row ───────────────────────
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Avatar
                             AnimatedBuilder(
                               animation: pulseCtrl,
                               builder: (_, __) => Container(
@@ -368,7 +514,6 @@ class _IdentityBlock extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    // Online dot
                                     Positioned(
                                       bottom: 6,
                                       right: 6,
@@ -387,15 +532,11 @@ class _IdentityBlock extends StatelessWidget {
                                 ),
                               ),
                             ),
-
                             const SizedBox(width: 16),
-
-                            // Name + meta
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // ID number tag
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 8, vertical: 3),
@@ -453,8 +594,6 @@ class _IdentityBlock extends StatelessWidget {
                             ),
                           ],
                         ),
-
-                        // ── Bio ─────────────────────────────────────────
                         if (user.bio != null && user.bio!.isNotEmpty) ...[
                           const SizedBox(height: 18),
                           Container(
@@ -493,8 +632,6 @@ class _IdentityBlock extends StatelessWidget {
                             ),
                           ),
                         ],
-
-                        // ── Admin button ─────────────────────────────────
                         if (isAdmin) ...[
                           const SizedBox(height: 16),
                           GestureDetector(
@@ -537,94 +674,27 @@ class _IdentityBlock extends StatelessWidget {
   }
 }
 
-// ─── Stats Strip ──────────────────────────────────────────────────────────────
-class _StatsStrip extends StatelessWidget {
-  final AnimationController entranceCtrl;
-  const _StatsStrip({required this.entranceCtrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: entranceCtrl,
-      builder: (_, child) => Opacity(
-        opacity: (entranceCtrl.value * 1.5 - 0.5).clamp(0.0, 1.0),
-        child: child,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-        child: Row(
-          children: [
-            _StatPill(value: '4', label: 'EVENTS', color: AppColors.cyan),
-            const SizedBox(width: 10),
-            _StatPill(value: '15', label: 'WINS', color: AppColors.green),
-            const SizedBox(width: 10),
-            _StatPill(value: '2', label: 'MVP', color: AppColors.magenta),
-            const SizedBox(width: 10),
-            _StatPill(value: '78%', label: 'W/R', color: AppColors.gold),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatPill extends StatelessWidget {
-  final String value, label;
-  final Color color;
-  const _StatPill(
-      {required this.value, required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: AppText.heading.copyWith(
-                color: color,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: AppText.label.copyWith(
-                color: AppColors.textMuted,
-                fontSize: 8,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Alert Row ────────────────────────────────────────────────────────────────
 class _AlertRow extends StatelessWidget {
   final Map<String, dynamic> data;
   final int index;
   final AnimationController entranceCtrl;
+  final VoidCallback onTap;
+  final ValueChanged<String> onMenuSelected;
 
   const _AlertRow({
+    super.key,
     required this.data,
     required this.index,
     required this.entranceCtrl,
+    required this.onTap,
+    required this.onMenuSelected,
   });
 
   @override
   Widget build(BuildContext context) {
     final isRead = data['read'] as bool;
+    final isArchived = data['archived'] as bool;
     final color = data['color'] as Color;
     final delay = 0.5 + index * 0.07;
 
@@ -638,98 +708,137 @@ class _AlertRow extends StatelessWidget {
           child: Opacity(opacity: progress, child: child),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(24, 0, 24, 10),
-        decoration: BoxDecoration(
-          color: isRead
-              ? AppColors.bg1.withOpacity(0.5)
-              : AppColors.bg2.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+          decoration: BoxDecoration(
             color: isRead
-                ? AppColors.border.withOpacity(0.4)
-                : color.withOpacity(0.35),
+                ? AppColors.bg1.withOpacity(0.5)
+                : AppColors.bg2.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isRead
+                  ? AppColors.border.withOpacity(0.4)
+                  : color.withOpacity(0.35),
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            // Left color accent bar
-            Container(
-              width: 4,
-              height: 64,
-              decoration: BoxDecoration(
-                color: isRead ? AppColors.border : color,
-                borderRadius:
-                    const BorderRadius.horizontal(left: Radius.circular(16)),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(data['icon'] as IconData, color: color, size: 16),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data['title'] as String,
-                      style: AppText.bodyMd.copyWith(
-                        color: isRead
-                            ? AppColors.textSecondary
-                            : AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      data['body'] as String,
-                      style: AppText.body
-                          .copyWith(color: AppColors.textMuted, fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: isRead ? AppColors.border : color,
+                  borderRadius:
+                      const BorderRadius.horizontal(left: Radius.circular(16)),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: Column(
+              const SizedBox(width: 14),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(data['icon'] as IconData, color: color, size: 16),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data['title'] as String,
+                        style: AppText.bodyMd.copyWith(
+                          color: isRead
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        data['body'] as String,
+                        style: AppText.body
+                            .copyWith(color: AppColors.textMuted, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (!isRead)
-                    Container(
-                      width: 8,
-                      height: 8,
-                      margin: const EdgeInsets.only(bottom: 6),
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                              color: color.withOpacity(0.5), blurRadius: 6)
+                  Row(
+                    children: [
+                      if (!isRead)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.only(right: 4),
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: color.withOpacity(0.5), blurRadius: 6)
+                            ],
+                          ),
+                        ),
+                      Text(
+                        data['time'] as String,
+                        style: AppText.caption
+                            .copyWith(fontSize: 10, color: AppColors.textMuted),
+                      ),
+
+                      // ── Three Dot Menu Container (Neutral Styling) ──
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert_rounded,
+                            color: AppColors.textMuted, size: 18),
+                        padding: EdgeInsets.zero,
+                        color: AppColors.bg1,
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: AppColors.border),
+                        ),
+                        onSelected: onMenuSelected,
+                        itemBuilder: (context) => [
+                          if (!isRead)
+                            PopupMenuItem(
+                              value: 'read',
+                              child: Text('Mark as read',
+                                  style: AppText.body
+                                      .copyWith(color: AppColors.textPrimary)),
+                            ),
+                          PopupMenuItem(
+                            value: isArchived ? 'unarchive' : 'archive',
+                            child: Text(isArchived ? 'Unarchive' : 'Archive',
+                                style: AppText.body
+                                    .copyWith(color: AppColors.textPrimary)),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Delete',
+                                style: AppText.body
+                                    .copyWith(color: AppColors.textPrimary)),
+                          ),
                         ],
                       ),
-                    ),
-                  Text(
-                    data['time'] as String,
-                    style: AppText.caption
-                        .copyWith(fontSize: 10, color: AppColors.textMuted),
+                    ],
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -862,12 +971,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top + kToolbarHeight;
+
     return Scaffold(
       backgroundColor: AppColors.bg0,
+      extendBodyBehindAppBar: true,
       appBar: const GlassAppBar(title: 'SETTINGS'),
       body: ListView(
-        padding: const EdgeInsets.all(24),
-        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(24, topPad + 24, 24, 24),
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         children: [
           _SettingsSection(
             title: 'ACCOUNT',
@@ -990,7 +1104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Icon(Icons.power_settings_new_rounded,
                       color: AppColors.red, size: 20),
                   const SizedBox(width: 16),
-                  Text('DISCONNECT SESSION',
+                  Text('SIGN OUT',
                       style: AppText.label.copyWith(color: AppColors.red)),
                   const Spacer(),
                   const Icon(Icons.chevron_right_rounded,
@@ -1122,8 +1236,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top + kToolbarHeight;
+
     return Scaffold(
       backgroundColor: AppColors.bg0,
+      extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
         title: 'EDIT IDENTITY',
         actions: [
@@ -1139,8 +1256,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(24, topPad + 24, 24, 24),
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         child: Form(
           key: _formKey,
           child: Column(
@@ -1265,7 +1384,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 }
 
-// ─── Profile Helpers (Section label + Tournament row) ───────────────────────
+// ─── Profile Helpers (Section label) ──────────────────────────────────────────
 class _SectionLabel extends StatelessWidget {
   final String label;
   final String? tag;
@@ -1316,67 +1435,6 @@ class _SectionLabel extends StatelessWidget {
                         .copyWith(color: tagColor ?? AppColors.cyan)),
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TournamentRow extends StatelessWidget {
-  final TournamentModel tournament;
-  final int index;
-  final AnimationController entranceCtrl;
-
-  const _TournamentRow({
-    required this.tournament,
-    required this.index,
-    required this.entranceCtrl,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final delay = 0.3 + index * 0.06;
-    return AnimatedBuilder(
-      animation: entranceCtrl,
-      builder: (_, child) {
-        final progress =
-            ((entranceCtrl.value - delay) / (1 - delay)).clamp(0.0, 1.0);
-        return Transform.translate(
-          offset: Offset(24 * (1 - progress), 0),
-          child: Opacity(opacity: progress, child: child),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.bg1,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            leading: CircleAvatar(
-              backgroundColor: AppColors.bg3,
-              child: Text(tournament.game.emoji,
-                  style: const TextStyle(fontSize: 18)),
-            ),
-            title: Text(tournament.title,
-                style: AppText.body.copyWith(fontWeight: FontWeight.bold)),
-            subtitle: Text(tournament.startDateDisplay,
-                style: AppText.caption.copyWith(color: AppColors.textMuted)),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.cyan.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.cyan.withOpacity(0.25)),
-              ),
-              child: Text(tournament.status.label,
-                  style: AppText.label.copyWith(color: AppColors.cyan)),
-            ),
-          ),
         ),
       ),
     );

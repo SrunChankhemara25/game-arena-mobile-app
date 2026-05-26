@@ -9,7 +9,14 @@ import 'player_detail_screen.dart';
 // ─── Team Detail Screen ───────────────────────────────────────────────────────
 class TeamDetailScreen extends StatefulWidget {
   final TeamModel team;
-  const TeamDetailScreen({super.key, required this.team});
+  // ── FIX: Added isViewOnly flag, defaulting to true to protect other teams ──
+  final bool isViewOnly;
+
+  const TeamDetailScreen({
+    super.key,
+    required this.team,
+    this.isViewOnly = true, // Defaults to view-only mode for tournament screen
+  });
 
   @override
   State<TeamDetailScreen> createState() => _TeamDetailScreenState();
@@ -135,10 +142,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen>
                     _RosterTab(
                       team: _team,
                       onTeamChanged: _onTeamChanged,
+                      isViewOnly: widget.isViewOnly, // ── Passed Flag
                     ),
                     _InfoTab(
                       team: _team,
                       onTeamChanged: _onTeamChanged,
+                      isViewOnly: widget.isViewOnly, // ── Passed Flag
                     ),
                     _MatchesTab(team: _team),
                   ],
@@ -360,8 +369,13 @@ class _WavePainter extends CustomPainter {
 class _RosterTab extends StatefulWidget {
   final TeamModel team;
   final ValueChanged<TeamModel> onTeamChanged;
+  final bool isViewOnly; // ── Passed Flag
 
-  const _RosterTab({required this.team, required this.onTeamChanged});
+  const _RosterTab({
+    required this.team,
+    required this.onTeamChanged,
+    required this.isViewOnly,
+  });
 
   @override
   State<_RosterTab> createState() => _RosterTabState();
@@ -469,6 +483,7 @@ class _RosterTabState extends State<_RosterTab> {
           mainLineup.length,
           AppColors.cyan,
           onAdd: () => _addPlayer(PlayerType.main),
+          isViewOnly: widget.isViewOnly, // ── Conditionally hide add buttons
         ),
         const SizedBox(height: 12),
         if (mainLineup.isEmpty)
@@ -478,6 +493,7 @@ class _RosterTabState extends State<_RosterTab> {
                 player: p,
                 accentColor: AppColors.cyan,
                 onDelete: () => _deletePlayer(p),
+                isViewOnly: widget.isViewOnly,
               )),
         const SizedBox(height: 28),
         _buildCategoryHeader(
@@ -485,6 +501,7 @@ class _RosterTabState extends State<_RosterTab> {
           substitutes.length,
           AppColors.gold,
           onAdd: () => _addPlayer(PlayerType.substitute),
+          isViewOnly: widget.isViewOnly,
         ),
         const SizedBox(height: 12),
         if (substitutes.isEmpty)
@@ -494,6 +511,7 @@ class _RosterTabState extends State<_RosterTab> {
                 player: p,
                 accentColor: AppColors.gold,
                 onDelete: () => _deletePlayer(p),
+                isViewOnly: widget.isViewOnly,
               )),
         const SizedBox(height: 28),
         _buildCategoryHeader(
@@ -501,6 +519,7 @@ class _RosterTabState extends State<_RosterTab> {
           coaches.length,
           AppColors.purple,
           onAdd: () => _addPlayer(PlayerType.coach),
+          isViewOnly: widget.isViewOnly,
         ),
         const SizedBox(height: 12),
         if (coaches.isEmpty)
@@ -510,6 +529,7 @@ class _RosterTabState extends State<_RosterTab> {
                 player: p,
                 accentColor: AppColors.purple,
                 onDelete: () => _deletePlayer(p),
+                isViewOnly: widget.isViewOnly,
               )),
         const SizedBox(height: 28),
         _buildCategoryHeader(
@@ -517,6 +537,7 @@ class _RosterTabState extends State<_RosterTab> {
           assistants.length,
           AppColors.magenta,
           onAdd: () => _addPlayer(PlayerType.assistantCoach),
+          isViewOnly: widget.isViewOnly,
         ),
         const SizedBox(height: 12),
         if (assistants.isEmpty)
@@ -526,6 +547,7 @@ class _RosterTabState extends State<_RosterTab> {
                 player: p,
                 accentColor: AppColors.magenta,
                 onDelete: () => _deletePlayer(p),
+                isViewOnly: widget.isViewOnly,
               )),
         const SizedBox(height: 32),
       ],
@@ -537,6 +559,7 @@ class _RosterTabState extends State<_RosterTab> {
     int count,
     Color color, {
     required VoidCallback onAdd,
+    required bool isViewOnly,
   }) {
     return Row(
       children: [
@@ -560,26 +583,28 @@ class _RosterTabState extends State<_RosterTab> {
           ),
         ),
         const Spacer(),
-        GestureDetector(
-          onTap: onAdd,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withOpacity(0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.add_rounded, size: 14, color: color),
-                const SizedBox(width: 4),
-                Text('ADD',
-                    style: AppText.label.copyWith(color: color, fontSize: 10)),
-              ],
+        if (!isViewOnly) // ── Only show ADD button if they are managing
+          GestureDetector(
+            onTap: onAdd,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: color.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_rounded, size: 14, color: color),
+                  const SizedBox(width: 4),
+                  Text('ADD',
+                      style:
+                          AppText.label.copyWith(color: color, fontSize: 10)),
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -618,11 +643,13 @@ class _PlayerCard extends StatelessWidget {
   final PlayerModel player;
   final Color accentColor;
   final VoidCallback onDelete;
+  final bool isViewOnly; // ── Flag for deleting
 
   const _PlayerCard({
     required this.player,
     required this.accentColor,
     required this.onDelete,
+    required this.isViewOnly,
   });
 
   @override
@@ -728,20 +755,24 @@ class _PlayerCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: onDelete,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.red.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.red.withOpacity(0.3)),
+                if (!isViewOnly) ...[
+                  // ── Only show delete button if they are managing
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: onDelete,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.red.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: AppColors.red.withOpacity(0.3)),
+                      ),
+                      child: const Icon(Icons.delete_outline_rounded,
+                          color: AppColors.red, size: 16),
                     ),
-                    child: const Icon(Icons.delete_outline_rounded,
-                        color: AppColors.red, size: 16),
                   ),
-                ),
+                ],
               ],
             ),
           ), // closes Material
@@ -751,12 +782,17 @@ class _PlayerCard extends StatelessWidget {
   }
 }
 
-// ─── Profile / Info Tab (Editable) ───────────────────────────────────────────
+// ─── Profile / Info Tab (Conditionally Editable) ────────────────────────────
 class _InfoTab extends StatefulWidget {
   final TeamModel team;
   final ValueChanged<TeamModel> onTeamChanged;
+  final bool isViewOnly; // ── Passed Flag
 
-  const _InfoTab({required this.team, required this.onTeamChanged});
+  const _InfoTab({
+    required this.team,
+    required this.onTeamChanged,
+    required this.isViewOnly,
+  });
 
   @override
   State<_InfoTab> createState() => _InfoTabState();
@@ -818,80 +854,85 @@ class _InfoTabState extends State<_InfoTab> {
           Row(
             children: [
               Text('TEAM PROFILE', style: _sectionStyle),
-              const Spacer(),
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  if (_editing) {
-                    _save();
-                  } else {
-                    setState(() => _editing = true);
-                  }
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _editing
-                        ? AppColors.green.withOpacity(0.1)
-                        : AppColors.cyan.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: _editing
-                            ? AppColors.green.withOpacity(0.4)
-                            : AppColors.cyan.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _editing ? Icons.check_rounded : Icons.edit_rounded,
-                        size: 14,
-                        color: _editing ? AppColors.green : AppColors.cyan,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _editing ? 'SAVE' : 'EDIT',
-                        style: AppText.label.copyWith(
-                            color: _editing ? AppColors.green : AppColors.cyan),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (_editing) ...[
-                const SizedBox(width: 8),
+              if (!widget.isViewOnly) ...[
+                // ── Only show EDIT and CANCEL controls if managing
+                const Spacer(),
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    _name.text = widget.team.name;
-                    _email.text = widget.team.contactEmail ?? '';
-                    _description.text = widget.team.description ?? '';
-                    _social.text = widget.team.socialLink ?? '';
-                    _country.text = widget.team.country ?? '';
-                    setState(() => _editing = false);
+                    if (_editing) {
+                      _save();
+                    } else {
+                      setState(() => _editing = true);
+                    }
                   },
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppColors.red.withOpacity(0.08),
+                      color: _editing
+                          ? AppColors.green.withOpacity(0.1)
+                          : AppColors.cyan.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.red.withOpacity(0.3)),
+                      border: Border.all(
+                          color: _editing
+                              ? AppColors.green.withOpacity(0.4)
+                              : AppColors.cyan.withOpacity(0.3)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.close_rounded,
-                            size: 14, color: AppColors.red),
+                        Icon(
+                          _editing ? Icons.check_rounded : Icons.edit_rounded,
+                          size: 14,
+                          color: _editing ? AppColors.green : AppColors.cyan,
+                        ),
                         const SizedBox(width: 6),
-                        Text('CANCEL',
-                            style:
-                                AppText.label.copyWith(color: AppColors.red)),
+                        Text(
+                          _editing ? 'SAVE' : 'EDIT',
+                          style: AppText.label.copyWith(
+                              color:
+                                  _editing ? AppColors.green : AppColors.cyan),
+                        ),
                       ],
                     ),
                   ),
                 ),
+                if (_editing) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _name.text = widget.team.name;
+                      _email.text = widget.team.contactEmail ?? '';
+                      _description.text = widget.team.description ?? '';
+                      _social.text = widget.team.socialLink ?? '';
+                      _country.text = widget.team.country ?? '';
+                      setState(() => _editing = false);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.red.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border:
+                            Border.all(color: AppColors.red.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.close_rounded,
+                              size: 14, color: AppColors.red),
+                          const SizedBox(width: 6),
+                          Text('CANCEL',
+                              style:
+                                  AppText.label.copyWith(color: AppColors.red)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ],
           ),

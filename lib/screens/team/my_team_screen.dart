@@ -920,7 +920,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 }
 
 // ─── Wizard Step 1 ────────────────────────────────────────────────────────────
-class _Step1TeamInfo extends StatelessWidget {
+class _Step1TeamInfo extends StatefulWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController teamName, contactEmail, description, social;
   final TextEditingController customGameName;
@@ -953,12 +953,45 @@ class _Step1TeamInfo extends StatelessWidget {
   });
 
   @override
+  State<_Step1TeamInfo> createState() => _Step1TeamInfoState();
+}
+
+class _Step1TeamInfoState extends State<_Step1TeamInfo> {
+  late TextEditingController _countryCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _countryCtrl = TextEditingController(text: widget.country);
+
+    // Auto-toggle parent state to custom mode so text input is processed correctly
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onCustomGameToggled(true);
+    });
+  }
+
+  @override
+  void didUpdateWidget(_Step1TeamInfo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.country != oldWidget.country &&
+        widget.country != _countryCtrl.text) {
+      _countryCtrl.text = widget.country;
+    }
+  }
+
+  @override
+  void dispose() {
+    _countryCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(24),
       child: Form(
-        key: formKey,
+        key: widget.formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -973,7 +1006,7 @@ class _Step1TeamInfo extends StatelessWidget {
             _buildFieldLabel('TEAM LOGO'),
             Center(
               child: GestureDetector(
-                onTap: onLogoTap,
+                onTap: widget.onLogoTap,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   width: 108,
@@ -982,12 +1015,12 @@ class _Step1TeamInfo extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: AppColors.bg3.withOpacity(0.5),
                     border: Border.all(
-                      color: teamLogo != null
+                      color: widget.teamLogo != null
                           ? AppColors.cyan
                           : AppColors.border.withOpacity(0.6),
-                      width: teamLogo != null ? 2.5 : 1.5,
+                      width: widget.teamLogo != null ? 2.5 : 1.5,
                     ),
-                    boxShadow: teamLogo != null
+                    boxShadow: widget.teamLogo != null
                         ? [
                             BoxShadow(
                                 color: AppColors.cyan.withOpacity(0.25),
@@ -995,14 +1028,14 @@ class _Step1TeamInfo extends StatelessWidget {
                                 spreadRadius: 2)
                           ]
                         : [],
-                    image: teamLogo != null
+                    image: widget.teamLogo != null
                         ? DecorationImage(
-                            image: FileImage(teamLogo!),
+                            image: FileImage(widget.teamLogo!),
                             fit: BoxFit.cover,
                           )
                         : null,
                   ),
-                  child: teamLogo == null
+                  child: widget.teamLogo == null
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -1027,7 +1060,7 @@ class _Step1TeamInfo extends StatelessWidget {
             const SizedBox(height: 28),
             _buildFieldLabel('TEAM ALIAS *'),
             TextFormField(
-              controller: teamName,
+              controller: widget.teamName,
               style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
               textInputAction: TextInputAction.next,
               validator: (v) => v!.isEmpty ? 'Team name is required' : null,
@@ -1039,125 +1072,43 @@ class _Step1TeamInfo extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             _buildFieldLabel('PRIMARY TITLE *'),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                ...GameTitle.values.map((g) => GestureDetector(
-                      onTap: () => onGameChanged(g),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: (!isCustomGame && game == g)
-                              ? AppColors.cyan.withOpacity(0.1)
-                              : AppColors.bg3.withOpacity(0.4),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: (!isCustomGame && game == g)
-                                  ? AppColors.cyan
-                                  : AppColors.border),
-                        ),
-                        child: Text(
-                          '${g.emoji} ${g.label.toUpperCase()}',
-                          style: AppText.label.copyWith(
-                              color: (!isCustomGame && game == g)
-                                  ? AppColors.cyan
-                                  : AppColors.textSecondary),
-                        ),
-                      ),
-                    )),
-                GestureDetector(
-                  onTap: () => onCustomGameToggled(true),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isCustomGame
-                          ? AppColors.purple.withOpacity(0.12)
-                          : AppColors.bg3.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: isCustomGame
-                              ? AppColors.purple
-                              : AppColors.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.edit_rounded,
-                            size: 13,
-                            color: isCustomGame
-                                ? AppColors.purple
-                                : AppColors.textSecondary),
-                        const SizedBox(width: 6),
-                        Text('OTHER',
-                            style: AppText.label.copyWith(
-                                color: isCustomGame
-                                    ? AppColors.purple
-                                    : AppColors.textSecondary)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+
+            // Fixed: Standardized styling to match the theme color of all other input containers
+            TextFormField(
+              controller: widget.customGameName,
+              style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
+              textInputAction: TextInputAction.next,
+              validator: (v) => v == null || v.trim().isEmpty
+                  ? 'Please enter the game name'
+                  : null,
+              decoration: const InputDecoration(
+                hintText: 'e.g. MLBB, Valorant, PUBG, Dota 2...',
+                prefixIcon: Icon(Icons.sports_esports_outlined,
+                    color: AppColors.textMuted, size: 20), // Matched color here
+              ),
             ),
-            if (isCustomGame) ...[
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: customGameName,
-                style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
-                textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    isCustomGame && (v == null || v.trim().isEmpty)
-                        ? 'Please enter the game name'
-                        : null,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Dota 2, Tekken 8, Apex Legends...',
-                  prefixIcon: const Icon(Icons.sports_esports_outlined,
-                      color: AppColors.purple, size: 20),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide:
-                        BorderSide(color: AppColors.purple.withOpacity(0.5)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: AppColors.purple),
-                  ),
-                ),
-              ),
-            ],
             const SizedBox(height: 24),
-            _buildFieldLabel('OPERATING REGION *'),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.bg3.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: country,
-                  isExpanded: true,
-                  dropdownColor: AppColors.bg2,
-                  style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textMuted),
-                  items: countries
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                      .toList(),
-                  onChanged: (v) => onCountryChanged(v!),
-                ),
+            _buildFieldLabel('OPERATING REGION / COUNTRY *'),
+
+            // Updated from Dropdown selection to editable TextFormField
+            TextFormField(
+              controller: _countryCtrl,
+              style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
+              textInputAction: TextInputAction.next,
+              onChanged: (v) => widget.onCountryChanged(v),
+              validator: (v) => v == null || v.trim().isEmpty
+                  ? 'Operating region/country is required'
+                  : null,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Cambodia, Philippines, Global',
+                prefixIcon: Icon(Icons.public_rounded,
+                    color: AppColors.textMuted, size: 20),
               ),
             ),
             const SizedBox(height: 24),
             _buildFieldLabel('COMMUNICATION EMAIL *'),
             TextFormField(
-              controller: contactEmail,
+              controller: widget.contactEmail,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
@@ -1172,7 +1123,7 @@ class _Step1TeamInfo extends StatelessWidget {
             const SizedBox(height: 24),
             _buildFieldLabel('TEAM BIOGRAPHY'),
             TextFormField(
-              controller: description,
+              controller: widget.description,
               maxLines: 4,
               style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
               decoration: const InputDecoration(
@@ -1182,7 +1133,7 @@ class _Step1TeamInfo extends StatelessWidget {
             const SizedBox(height: 24),
             _buildFieldLabel('SOCIAL TRANSMISSION (Optional)'),
             TextFormField(
-              controller: social,
+              controller: widget.social,
               textInputAction: TextInputAction.done,
               style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
               decoration: const InputDecoration(
@@ -1290,6 +1241,13 @@ class _Step2Players extends StatelessWidget {
             ...players.asMap().entries.map((e) {
               final p = e.value;
               final type = p['type'] as PlayerType;
+              final String ign = p['ign'] as String? ?? '';
+
+              // Crash Prevention: Fallback to '?' if the user left the IGN field blank
+              final String initialLetter = ign.trim().isNotEmpty
+                  ? ign.trim().substring(0, 1).toUpperCase()
+                  : '?';
+
               final Color color = type == PlayerType.main
                   ? AppColors.cyan
                   : type == PlayerType.substitute
@@ -1311,7 +1269,7 @@ class _Step2Players extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          (p['ign'] as String).substring(0, 1).toUpperCase(),
+                          initialLetter,
                           style: AppText.heading
                               .copyWith(color: color, fontSize: 16),
                         ),
@@ -1322,12 +1280,12 @@ class _Step2Players extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(p['ign'] as String,
+                          Text(ign.isNotEmpty ? ign : 'Unnamed Player',
                               style: AppText.bodyMd.copyWith(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.bold)),
                           const SizedBox(height: 2),
-                          Text('${p['fullName']} • ${p['role']}',
+                          Text('${p['fullName'] ?? ''} • ${p['role'] ?? ''}',
                               style: AppText.caption),
                         ],
                       ),
@@ -1589,10 +1547,11 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
   final _idNumber = TextEditingController();
   final _dob = TextEditingController();
   final _roleController = TextEditingController();
+  final _nationalityController =
+      TextEditingController(text: 'Cambodian'); // 👈 Added Controller
 
   late String _role;
   PlayerType _type = PlayerType.main;
-  String _nationality = 'Cambodian';
   String _idType = 'National ID';
   String _jerseyNo = '';
   bool _showRoleSuggestions = false;
@@ -1659,7 +1618,8 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
       'ign': _ign.text,
       'role': _roleController.text.isNotEmpty ? _roleController.text : _role,
       'type': _type,
-      'nationality': _nationality,
+      'nationality':
+          _nationalityController.text.trim(), // 👈 Updated to save typed text
       'idType': _idType,
       'idNumber': _idNumber.text,
       'dob': _dob.text,
@@ -1676,6 +1636,7 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
     _idNumber.dispose();
     _dob.dispose();
     _roleController.dispose();
+    _nationalityController.dispose(); // 👈 Properly disposed
     super.dispose();
   }
 
@@ -1964,38 +1925,23 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
                     ),
                     const SizedBox(height: 24),
                     _buildLabel('NATIONALITY *'),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.bg3.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _nationality,
-                          isExpanded: true,
-                          dropdownColor: AppColors.bg2,
-                          style: AppText.bodyMd
-                              .copyWith(color: AppColors.textPrimary),
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                              color: AppColors.textMuted),
-                          items: [
-                            'Cambodian',
-                            'Thai',
-                            'Vietnamese',
-                            'Filipino',
-                            'Indonesian',
-                            'Malaysian'
-                          ]
-                              .map((n) =>
-                                  DropdownMenuItem(value: n, child: Text(n)))
-                              .toList(),
-                          onChanged: (v) => setState(() => _nationality = v!),
-                        ),
+
+                    // 👈 UPDATED: Replaced dropdown with standard text input field
+                    TextFormField(
+                      controller: _nationalityController,
+                      style:
+                          AppText.bodyMd.copyWith(color: AppColors.textPrimary),
+                      textInputAction: TextInputAction.next,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Nationality input required'
+                          : null,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. Cambodian, Thai, Filipino',
+                        prefixIcon: Icon(Icons.public_rounded,
+                            color: AppColors.textMuted, size: 20),
                       ),
                     ),
+
                     const SizedBox(height: 24),
                     _buildLabel('DATE OF BIRTH *'),
                     GestureDetector(

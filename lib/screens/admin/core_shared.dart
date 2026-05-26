@@ -1,0 +1,1139 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+class AC {
+  static const bg0 = Color(0xFF0B0E1A);
+  static const bg1 = Color(0xFF101423);
+  static const bg2 = Color(0xFF171C2D);
+  static const bg3 = Color(0xFF20263A);
+  static const bg4 = Color(0xFF2A3148);
+
+  static const pink = Color(0xFFFF168B);
+  static const purple = Color(0xFFA414FF);
+  static const cyan = Color(0xFF00E5FF);
+  static const cyanDeep = Color(0xFF00B8D4);
+  static const blue = Color(0xFF5D72FF);
+  static const green = Color(0xFF22C55E);
+  static const red = Color(0xFFEF4444);
+  static const gold = Color(0xFFF59E0B);
+  static const orange = Color(0xFFF97316);
+  static const violet = Color(0xFF8B5CF6);
+
+  static const textPrimary = Color(0xFFF5F7FB);
+  static const textSecondary = Color(0xFFB8C6D8);
+  static const textMuted = Color(0xFF6B738C);
+
+  static const border = Color(0xFF2B3046);
+  static const borderStrong = Color(0xFF383E57);
+
+  static const gradPrimary = LinearGradient(
+    colors: [pink, purple],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  static const gradPrimaryVert = LinearGradient(
+    colors: [Color(0xFFFF0F7B), Color(0xFFBC00FF)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const gradCard = LinearGradient(
+    colors: [Color(0xFF191E31), Color(0xFF121624)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const gradHero = LinearGradient(
+    colors: [Color(0xFF14182A), Color(0xFF0B0F1C)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+}
+
+class AT {
+  static const display = TextStyle(
+    fontSize: 28,
+    fontWeight: FontWeight.w800,
+    color: AC.textPrimary,
+    height: 1.1,
+    letterSpacing: -0.4,
+  );
+
+  static const heading = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w700,
+    color: AC.textPrimary,
+    letterSpacing: -0.2,
+  );
+
+  static const subheading = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+    color: AC.textPrimary,
+  );
+
+  static const body = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    color: AC.textSecondary,
+    height: 1.55,
+  );
+
+  static const label = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w700,
+    color: AC.textMuted,
+    letterSpacing: 1.15,
+  );
+
+  static const caption = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: AC.textMuted,
+  );
+}
+
+BoxDecoration cardDecor({
+  Color? border,
+  double radius = 22,
+  bool elevated = false,
+  Gradient? gradient,
+}) =>
+    BoxDecoration(
+      gradient: gradient ?? AC.gradCard,
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: border ?? AC.border, width: 1),
+      boxShadow: elevated
+          ? [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.24),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+              ),
+            ]
+          : null,
+    );
+
+InputDecoration fieldDecor({
+  required String hint,
+  IconData? icon,
+  Widget? suffix,
+}) =>
+    InputDecoration(
+      hintText: hint,
+      hintStyle: AT.caption.copyWith(color: AC.textMuted),
+      prefixIcon: icon != null ? Icon(icon, color: AC.cyan, size: 18) : null,
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: AC.bg3,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AC.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AC.cyan, width: 1.4),
+      ),
+    );
+
+enum GameCtx {
+  mlbb('Mobile Legends', '⚔️'),
+  pubg('PUBG Mobile', '🪂'),
+  freeFire('Free Fire', '🔥'),
+  valorant('Valorant', '🎯'),
+  cod('COD Mobile', '💣'),
+  eFootball('eFootball', '⚽'),
+  other('Other', '🎮');
+
+  final String label;
+  final String emoji;
+  const GameCtx(this.label, this.emoji);
+}
+
+enum TourStatus {
+  upcoming('Upcoming'),
+  open('Open'),
+  live('Live'),
+  closed('Closed');
+
+  final String label;
+  const TourStatus(this.label);
+}
+
+enum ApprovalState {
+  pending('Pending'),
+  approved('Approved'),
+  rejected('Rejected');
+
+  final String label;
+  const ApprovalState(this.label);
+}
+
+enum UserStatus {
+  active('Active'),
+  suspended('Suspended');
+
+  final String label;
+  const UserStatus(this.label);
+}
+
+enum TourFormat {
+  singleElim('Single Elimination'),
+  doubleElim('Double Elimination'),
+  groupStage('Group Stage'),
+  groupAndElim('Group + Playoffs'),
+  roundRobin('Round Robin');
+
+  final String label;
+  const TourFormat(this.label);
+}
+
+class AppUser {
+  final String id;
+  String name;
+  String email;
+  UserStatus status;
+  String role;
+  String? country;
+
+  AppUser({
+    required this.id,
+    required this.name,
+    required this.email,
+    this.status = UserStatus.active,
+    this.role = 'Player',
+    this.country,
+  });
+}
+
+class TeamReg {
+  final String id;
+  String teamName;
+  String region;
+  List<String> roster;
+  String? coach;
+  String? assistantCoach;
+  String? manager;
+  String? note;
+  ApprovalState state;
+
+  TeamReg({
+    required this.id,
+    required this.teamName,
+    required this.region,
+    required this.roster,
+    this.coach,
+    this.assistantCoach,
+    this.manager,
+    this.note,
+    this.state = ApprovalState.pending,
+  });
+
+  int get lineupCount =>
+      roster.where((player) => player.trim().isNotEmpty).toList().length;
+}
+
+class ScheduleEntry {
+  final String id;
+  String round;
+  String teamA;
+  String teamB;
+  String date;
+  String time;
+  String? venue;
+
+  ScheduleEntry({
+    required this.id,
+    required this.round,
+    required this.teamA,
+    required this.teamB,
+    required this.date,
+    required this.time,
+    this.venue,
+  });
+}
+
+class MatchNode {
+  final String id;
+  String teamA;
+  String teamB;
+  int scoreA;
+  int scoreB;
+  String? date;
+  String? time;
+  String? winner;
+  bool isFinalized;
+
+  MatchNode({
+    required this.id,
+    required this.teamA,
+    required this.teamB,
+    this.scoreA = 0,
+    this.scoreB = 0,
+    this.date,
+    this.time,
+    this.winner,
+    this.isFinalized = false,
+  });
+}
+
+class BracketRound {
+  final String id;
+  String roundName;
+  List<MatchNode> matches;
+
+  BracketRound({
+    required this.id,
+    required this.roundName,
+    required this.matches,
+  });
+}
+
+class StandingEntry {
+  final String id;
+  String teamName;
+  int played;
+  int wins;
+  int losses;
+  int gameWins;
+  int gameLosses;
+  int points;
+
+  StandingEntry({
+    required this.id,
+    required this.teamName,
+    required this.played,
+    required this.wins,
+    required this.losses,
+    this.gameWins = 0,
+    this.gameLosses = 0,
+    required this.points,
+  });
+
+  int get diff => gameWins - gameLosses;
+}
+
+class Tournament {
+  final String id;
+  String title;
+  GameCtx game;
+  String? logoUrl;
+  TourStatus status;
+  String prize;
+  String type;
+  TourFormat format;
+  String? startDate;
+  String? endDate;
+  String? regDeadline;
+  String? description;
+  String? requirements;
+  String? organizer;
+  String? location;
+  int maxTeams;
+  bool isArchived;
+  List<TeamReg> registrants;
+  List<ScheduleEntry> schedules;
+  List<BracketRound> bracketRounds;
+  List<StandingEntry> standings;
+
+  Tournament({
+    required this.id,
+    required this.title,
+    required this.game,
+    this.logoUrl,
+    required this.status,
+    required this.prize,
+    this.type = 'Squad',
+    this.format = TourFormat.singleElim,
+    this.startDate,
+    this.endDate,
+    this.regDeadline,
+    this.description,
+    this.requirements,
+    this.organizer,
+    this.location,
+    this.maxTeams = 16,
+    this.isArchived = false,
+    required this.registrants,
+    List<ScheduleEntry>? schedules,
+    List<BracketRound>? bracketRounds,
+    List<StandingEntry>? standings,
+  })  : schedules = schedules ?? [],
+        bracketRounds = bracketRounds ?? [],
+        standings = standings ?? [];
+
+  int get pendingCount => registrants
+      .where((team) => team.state == ApprovalState.pending)
+      .toList()
+      .length;
+
+  int get approvedCount => registrants
+      .where((team) => team.state == ApprovalState.approved)
+      .toList()
+      .length;
+
+  int get spotsLeft => maxTeams - registrants.length;
+
+  String? get resolvedLogoUrl => logoUrl ?? defaultGameLogoUrl(game);
+}
+
+class DB {
+  static List<AppUser> users = [
+    AppUser(
+      id: 'u1',
+      name: 'Nova Admin',
+      email: 'admin@gamearena.gg',
+      role: 'Administrator',
+      country: 'Cambodia',
+    ),
+    AppUser(
+      id: 'u2',
+      name: 'Sok Dara',
+      email: 'dara@shadowwolves.gg',
+      role: 'Captain',
+      country: 'Cambodia',
+    ),
+    AppUser(
+      id: 'u3',
+      name: 'Lina Park',
+      email: 'lina@blacktide.gg',
+      role: 'Manager',
+      country: 'South Korea',
+    ),
+    AppUser(
+      id: 'u4',
+      name: 'Keo Piseth',
+      email: 'piseth@campusclutch.gg',
+      role: 'Player',
+      status: UserStatus.suspended,
+      country: 'Cambodia',
+    ),
+  ];
+
+  static List<Tournament> tournaments = [
+    Tournament(
+      id: 'tour_1',
+      title: 'GameArena MLBB Pro Circuit',
+      game: GameCtx.mlbb,
+      logoUrl: defaultGameLogoUrl(GameCtx.mlbb),
+      status: TourStatus.live,
+      prize: '\$12,000',
+      type: '5v5',
+      format: TourFormat.groupAndElim,
+      startDate: '2026-06-01',
+      endDate: '2026-06-28',
+      regDeadline: '2026-05-28',
+      organizer: 'GameArena Cambodia',
+      location: 'Phnom Penh',
+      description:
+          'Top MLBB squads compete through group stage and playoffs for the mid-season title.',
+      requirements:
+          'Minimum 5 main players, 1 coach contact, and valid in-game accounts for all starters.',
+      maxTeams: 8,
+      registrants: [
+        TeamReg(
+          id: 'mlbb_1',
+          teamName: 'Shadow Wolves KH',
+          region: 'Cambodia',
+          roster: [
+            'ShadowX',
+            'BladeKH',
+            'StormZz',
+            'VoidEdge',
+            'RexNova',
+          ],
+          coach: 'IronFist',
+          assistantCoach: 'PulseNine',
+          manager: 'Mira',
+          note: 'Documents verified. Waiting for final admin decision.',
+          state: ApprovalState.pending,
+        ),
+        TeamReg(
+          id: 'mlbb_2',
+          teamName: 'Blacklist Rising',
+          region: 'Philippines',
+          roster: [
+            'OHEB',
+            'Wise',
+            'Edward',
+            'YveHeart',
+            'Nexus',
+          ],
+          coach: 'Bon Chan Jr',
+          assistantCoach: 'Melo',
+          manager: 'Paula',
+          note: 'Lineup confirmed for week one.',
+          state: ApprovalState.approved,
+        ),
+        TeamReg(
+          id: 'mlbb_3',
+          teamName: 'Crimson Echo',
+          region: 'Malaysia',
+          roster: [
+            'RazeMY',
+            'Apex',
+            'Tidal',
+            'Kairo',
+            'Rune',
+          ],
+          coach: 'Coach Ren',
+          assistantCoach: 'Aeron',
+          manager: 'Lumi',
+          note: 'Roster mismatch detected on player UID submission.',
+          state: ApprovalState.rejected,
+        ),
+      ],
+      schedules: [
+        ScheduleEntry(
+          id: 'sch_1',
+          round: 'Group Stage - Day 1',
+          teamA: 'Shadow Wolves KH',
+          teamB: 'Blacklist Rising',
+          date: '2026-06-01',
+          time: '15:00',
+          venue: 'GameArena Main Stage',
+        ),
+        ScheduleEntry(
+          id: 'sch_2',
+          round: 'Group Stage - Day 2',
+          teamA: 'Crimson Echo',
+          teamB: 'Shadow Wolves KH',
+          date: '2026-06-03',
+          time: '18:30',
+          venue: 'GameArena Main Stage',
+        ),
+      ],
+      bracketRounds: [
+        BracketRound(
+          id: 'br_1',
+          roundName: 'Semifinals',
+          matches: [
+            MatchNode(
+              id: 'm_1',
+              teamA: 'Shadow Wolves KH',
+              teamB: 'Blacklist Rising',
+              scoreA: 2,
+              scoreB: 1,
+              winner: 'Shadow Wolves KH',
+              date: '2026-06-21',
+              time: '17:00',
+              isFinalized: true,
+            ),
+            MatchNode(
+              id: 'm_2',
+              teamA: 'Crimson Echo',
+              teamB: 'TBD',
+              date: '2026-06-22',
+              time: '19:00',
+            ),
+          ],
+        ),
+        BracketRound(
+          id: 'br_2',
+          roundName: 'Grand Final',
+          matches: [
+            MatchNode(
+              id: 'm_3',
+              teamA: 'Shadow Wolves KH',
+              teamB: 'TBD',
+            ),
+          ],
+        ),
+      ],
+      standings: [
+        StandingEntry(
+          id: 'st_1',
+          teamName: 'Shadow Wolves KH',
+          played: 4,
+          wins: 3,
+          losses: 1,
+          gameWins: 11,
+          gameLosses: 5,
+          points: 9,
+        ),
+        StandingEntry(
+          id: 'st_2',
+          teamName: 'Blacklist Rising',
+          played: 4,
+          wins: 2,
+          losses: 2,
+          gameWins: 8,
+          gameLosses: 7,
+          points: 6,
+        ),
+        StandingEntry(
+          id: 'st_3',
+          teamName: 'Crimson Echo',
+          played: 4,
+          wins: 1,
+          losses: 3,
+          gameWins: 5,
+          gameLosses: 10,
+          points: 3,
+        ),
+      ],
+    ),
+    Tournament(
+      id: 'tour_2',
+      title: 'PUBG Mobile Campus Open',
+      game: GameCtx.pubg,
+      logoUrl: defaultGameLogoUrl(GameCtx.pubg),
+      status: TourStatus.open,
+      prize: '\$4,500',
+      type: 'Squad',
+      format: TourFormat.groupStage,
+      startDate: '2026-07-10',
+      endDate: '2026-07-20',
+      regDeadline: '2026-07-01',
+      organizer: 'Campus League',
+      location: 'Online',
+      description:
+          'Open campus circuit for university PUBG Mobile squads across Cambodia.',
+      requirements:
+          'Teams can submit up to 4 starters and 2 substitutes before check-in.',
+      maxTeams: 24,
+      registrants: [
+        TeamReg(
+          id: 'pubg_1',
+          teamName: 'Campus Clutch',
+          region: 'Phnom Penh',
+          roster: ['Pioneer', 'SnipeR', 'Vanta', 'Glider'],
+          coach: 'Coach K',
+          assistantCoach: 'Raf',
+          manager: 'Nika',
+          note: 'New roster uploaded after qualifier.',
+          state: ApprovalState.pending,
+        ),
+        TeamReg(
+          id: 'pubg_2',
+          teamName: 'Night Raiders',
+          region: 'Battambang',
+          roster: ['NightOwl', 'Phantom', 'DeltaRush', 'SkyLock'],
+          coach: 'Major B',
+          assistantCoach: null,
+          manager: 'Rin',
+          state: ApprovalState.pending,
+        ),
+      ],
+      schedules: [],
+      bracketRounds: [],
+      standings: [],
+    ),
+    Tournament(
+      id: 'tour_3',
+      title: 'Valorant City Invitational',
+      game: GameCtx.valorant,
+      logoUrl: defaultGameLogoUrl(GameCtx.valorant),
+      status: TourStatus.upcoming,
+      prize: '\$3,200',
+      type: '5v5',
+      format: TourFormat.doubleElim,
+      startDate: '2026-08-04',
+      endDate: '2026-08-11',
+      regDeadline: '2026-07-25',
+      organizer: 'City Arena',
+      location: 'Siem Reap',
+      description:
+          'An invitational built for disciplined rosters and mid-season testing.',
+      requirements:
+          'Each team must submit a coach or assistant coach point of contact.',
+      maxTeams: 8,
+      registrants: [
+        TeamReg(
+          id: 'val_1',
+          teamName: 'Blue Mirage',
+          region: 'Cambodia',
+          roster: ['Aster', 'Keen', 'Haze', 'Miko', 'Cero'],
+          coach: 'Jettson',
+          assistantCoach: 'Lix',
+          manager: 'Bora',
+          state: ApprovalState.approved,
+        ),
+        TeamReg(
+          id: 'val_2',
+          teamName: 'Neon District',
+          region: 'Thailand',
+          roster: ['Juno', 'Kilo', 'Reef', 'Sol', 'Mint'],
+          coach: 'Vanta',
+          assistantCoach: 'Cyan',
+          manager: 'Pim',
+          state: ApprovalState.pending,
+        ),
+      ],
+      schedules: [],
+      bracketRounds: [
+        BracketRound(
+          id: 'val_br_1',
+          roundName: 'Upper Round 1',
+          matches: [
+            MatchNode(
+              id: 'val_m_1',
+              teamA: 'Blue Mirage',
+              teamB: 'Neon District',
+              date: '2026-08-04',
+              time: '14:00',
+            ),
+          ],
+        ),
+      ],
+      standings: [],
+    ),
+    Tournament(
+      id: 'tour_4',
+      title: 'Free Fire Weekend Clash',
+      game: GameCtx.freeFire,
+      logoUrl: defaultGameLogoUrl(GameCtx.freeFire),
+      status: TourStatus.closed,
+      prize: '\$1,800',
+      type: 'Squad',
+      format: TourFormat.singleElim,
+      startDate: '2026-05-01',
+      endDate: '2026-05-03',
+      regDeadline: '2026-04-25',
+      organizer: 'FF Community Hub',
+      location: 'Online',
+      description: 'Weekend knockout event for fast-turnover community teams.',
+      maxTeams: 16,
+      isArchived: true,
+      registrants: [
+        TeamReg(
+          id: 'ff_1',
+          teamName: 'Fireline',
+          region: 'Cambodia',
+          roster: ['Flare', 'Zen', 'Bolt', 'Nova'],
+          coach: 'Ash',
+          assistantCoach: 'Grey',
+          manager: 'Uma',
+          state: ApprovalState.approved,
+        ),
+      ],
+      schedules: [],
+      bracketRounds: [],
+      standings: [],
+    ),
+  ];
+}
+
+Color approvalColor(ApprovalState state) => switch (state) {
+      ApprovalState.pending => AC.gold,
+      ApprovalState.approved => AC.green,
+      ApprovalState.rejected => AC.red,
+    };
+
+Color tourStatusColor(TourStatus status) => switch (status) {
+      TourStatus.upcoming => AC.cyan,
+      TourStatus.open => AC.green,
+      TourStatus.live => AC.orange,
+      TourStatus.closed => AC.textMuted,
+    };
+
+Color userStatusColor(UserStatus status) => switch (status) {
+      UserStatus.active => AC.green,
+      UserStatus.suspended => AC.red,
+    };
+
+String? defaultGameLogoUrl(GameCtx game) => switch (game) {
+      GameCtx.mlbb =>
+        'https://upload.wikimedia.org/wikipedia/en/thumb/9/90/Mobile_Legends_Bang_Bang_logo.png/320px-Mobile_Legends_Bang_Bang_logo.png',
+      GameCtx.pubg =>
+        'https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/PUBG_Mobile_logo.svg/320px-PUBG_Mobile_logo.svg.png',
+      GameCtx.freeFire =>
+        'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Garena_Free_Fire_logo.svg/320px-Garena_Free_Fire_logo.svg.png',
+      GameCtx.valorant =>
+        'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Valorant_logo_-_pink_color_version.svg/320px-Valorant_logo_-_pink_color_version.svg.png',
+      GameCtx.cod =>
+        'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Call_of_Duty_Mobile_logo.svg/320px-Call_of_Duty_Mobile_logo.svg.png',
+      GameCtx.eFootball =>
+        'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/EFootball_logo.svg/320px-EFootball_logo.svg.png',
+      GameCtx.other => null,
+    };
+
+String compactInitials(String value, {int maxChars = 2}) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return '?';
+  final parts = trimmed.split(RegExp(r'\s+'));
+  if (parts.length == 1) {
+    return parts.first
+        .substring(0, math.min(parts.first.length, maxChars))
+        .toUpperCase();
+  }
+  return parts
+      .take(maxChars)
+      .map((part) => part.isEmpty ? '' : part[0].toUpperCase())
+      .join();
+}
+
+class GradButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final double? width;
+  final IconData? icon;
+
+  const GradButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.width,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: width,
+        height: 50,
+        decoration: BoxDecoration(
+          gradient: AC.gradPrimary,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AC.purple.withOpacity(0.2),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 18, color: Colors.white),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AdminLogoBadge extends StatelessWidget {
+  final String? imageUrl;
+  final String fallback;
+  final double size;
+  final double radius;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final TextStyle? textStyle;
+
+  const AdminLogoBadge({
+    super.key,
+    required this.imageUrl,
+    required this.fallback,
+    this.size = 52,
+    this.radius = 16,
+    this.backgroundColor,
+    this.borderColor,
+    this.textStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedFallback = compactInitials(fallback);
+    final bg = backgroundColor ?? AC.bg3;
+    final border = borderColor ?? AC.border;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: border),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius - 1),
+        child: imageUrl != null && imageUrl!.trim().isNotEmpty
+            ? Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _FallbackLogo(
+                  fallback: resolvedFallback,
+                  textStyle: textStyle,
+                ),
+              )
+            : _FallbackLogo(
+                fallback: resolvedFallback,
+                textStyle: textStyle,
+              ),
+      ),
+    );
+  }
+}
+
+class _FallbackLogo extends StatelessWidget {
+  final String fallback;
+  final TextStyle? textStyle;
+
+  const _FallbackLogo({
+    required this.fallback,
+    this.textStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(gradient: AC.gradCard),
+      child: Center(
+        child: Text(
+          fallback,
+          style: textStyle ??
+              const TextStyle(
+                color: AC.cyan,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+        ),
+      ),
+    );
+  }
+}
+
+class OutlineBtn extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final Color? color;
+  final EdgeInsetsGeometry? padding;
+
+  const OutlineBtn({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.color,
+    this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = color ?? AC.cyan;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 46,
+        padding: padding ?? const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          color: tone.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: tone.withOpacity(0.45)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: tone),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: tone,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class StatusBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const StatusBadge({
+    super.key,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: AT.label.copyWith(color: color, fontSize: 10),
+      ),
+    );
+  }
+}
+
+class SectionHdr extends StatelessWidget {
+  final String title;
+  final String? trailing;
+
+  const SectionHdr({
+    super.key,
+    required this.title,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 16,
+            decoration: BoxDecoration(
+              gradient: AC.gradPrimaryVert,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: AT.label.copyWith(color: AC.textSecondary),
+            ),
+          ),
+          if (trailing != null)
+            Text(
+              trailing!,
+              style: AT.caption.copyWith(color: AC.cyan),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AC.bg3,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AC.border),
+              ),
+              child: Icon(icon, color: AC.cyan, size: 30),
+            ),
+            const SizedBox(height: 18),
+            Text(title, style: AT.heading, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: AT.body,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<bool> showConfirmDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  String confirmLabel = 'Confirm',
+  Color confirmColor = AC.red,
+  IconData icon = Icons.warning_amber_rounded,
+}) async {
+  return await showDialog<bool>(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: AC.bg2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(26),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: confirmColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: confirmColor.withOpacity(0.28)),
+                  ),
+                  child: Icon(icon, color: confirmColor, size: 30),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  style: AT.heading.copyWith(fontSize: 17),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: AT.body,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlineBtn(
+                        label: 'Cancel',
+                        color: AC.textSecondary,
+                        onTap: () => Navigator.pop(context, false),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlineBtn(
+                        label: confirmLabel,
+                        color: confirmColor,
+                        onTap: () => Navigator.pop(context, true),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ) ??
+      false;
+}
