@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -20,6 +22,9 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> {
   int _tab = 0;
 
+  StreamSubscription<List<AppUser>>? _usersSub;
+  StreamSubscription<List<Tournament>>? _tournamentsSub;
+
   final _tabs = const [
     _NavItem(Icons.dashboard_customize_rounded, 'Overview'),
     _NavItem(Icons.emoji_events_rounded, 'Tournaments'),
@@ -33,7 +38,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
     super.initState();
     DB.initialize().then((_) {
       if (mounted) setState(() {});
+      _subscribeToStreams();
     });
+  }
+
+  void _subscribeToStreams() {
+    // Keep DB.users and DB.tournaments in sync with Firestore in real-time
+    _usersSub = DB.watchUsers().listen((users) {
+      if (!mounted) return;
+      DB.users = users;
+      setState(() {});
+    });
+    _tournamentsSub = DB.watchTournaments().listen((tournaments) {
+      if (!mounted) return;
+      DB.tournaments = tournaments;
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _usersSub?.cancel();
+    _tournamentsSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _signOut() async {

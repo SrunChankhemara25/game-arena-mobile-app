@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../services/backend_service.dart';
 import 'core_shared.dart';
 
 class AdminBroadcastView extends StatefulWidget {
@@ -10,13 +13,13 @@ class AdminBroadcastView extends StatefulWidget {
 }
 
 class _AdminBroadcastViewState extends State<AdminBroadcastView> {
-  bool _toAll = true;
-  String? _selectedEmail;
-  final _emailCtrl = TextEditingController();
   final _titleCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  bool _toAll = true;
 
-  final List<_BroadcastRecord> _history = [];
+  List<BroadcastRecord> _history = [];
+  StreamSubscription<List<BroadcastRecord>>? _historySub;
 
   @override
   void initState() {
@@ -24,13 +27,18 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
     DB.initialize().then((_) {
       if (mounted) setState(() {});
     });
+    // Subscribe to real-time broadcast history from Firestore
+    _historySub = DB.watchBroadcastHistory().listen((records) {
+      if (mounted) setState(() => _history = records);
+    });
   }
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
     _titleCtrl.dispose();
     _messageCtrl.dispose();
+    _emailCtrl.dispose();
+    _historySub?.cancel();
     super.dispose();
   }
 
@@ -120,52 +128,18 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
                       ],
                     ),
                   ),
+                  // Specific user — type email manually only
                   if (!_toAll) ...[
                     const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedEmail,
-                      isDense: true,
-                      isExpanded: true,
-                      dropdownColor: AC.bg3,
-                      style: const TextStyle(
-                        color: AC.textPrimary,
-                        fontSize: 14,
-                      ),
-                      decoration: fieldDecor(
-                        hint: 'Select a user',
-                        icon: Icons.person_rounded,
-                      ),
-                      items: DB.users
-                          .map(
-                            (user) => DropdownMenuItem<String>(
-                              value: user.email,
-                              child: Text(
-                                '${user.name} (${user.email})',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedEmail = value;
-                          _emailCtrl.text = value ?? '';
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
                     TextField(
                       controller: _emailCtrl,
+                      onChanged: (_) => setState(() {}),
                       style: const TextStyle(color: AC.textPrimary),
+                      keyboardType: TextInputType.emailAddress,
                       decoration: fieldDecor(
-                        hint: 'Or type email manually',
+                        hint: 'Enter user email',
                         icon: Icons.alternate_email_rounded,
                       ),
-                      onChanged: (value) {
-                        if (_selectedEmail != value) {
-                          setState(() => _selectedEmail = null);
-                        }
-                      },
                     ),
                   ],
                 ],
@@ -274,7 +248,7 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
                 itemCount: _history.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
-                  final record = _history[_history.length - 1 - index];
+                  final record = _history[index]; // sorted newest-first by stream
                   return _BroadcastHistoryTile(
                     record: record,
                     onDelete: () => _confirmDelete(record),
@@ -296,31 +270,33 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
     if (message.isEmpty) return;
     if (!_toAll && target.isEmpty) return;
 
+    final now = DateTime.now();
+    final resolvedTitle = _titleCtrl.text.trim().isEmpty
+        ? 'GameArena Update'
+        : _titleCtrl.text.trim();
+
     await DB.sendBroadcast(
-      title: _titleCtrl.text.trim(),
+      title: resolvedTitle,
       message: message,
       email: _toAll ? null : target,
     );
 
-    setState(() {
-      _history.add(
-        _BroadcastRecord(
-          title: _titleCtrl.text.trim().isEmpty
-              ? 'GameArena Update'
-              : _titleCtrl.text.trim(),
-          message: message,
-          recipient: _toAll ? 'All users' : target,
-          sentAt: DateTime.now(),
-        ),
-      );
-    });
+    // Persist the broadcast record to Firestore so history survives sessions
+    await DB.saveBroadcastRecord(
+      BroadcastRecord(
+        id: 'broadcast_${now.millisecondsSinceEpoch}',
+        title: resolvedTitle,
+        message: message,
+        recipient: _toAll ? 'All users' : target,
+        sentAt: now,
+      ),
+    );
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _toAll
-              ? 'Broadcast sent to all users'
-              : 'Broadcast sent to ${target.isEmpty ? 'selected user' : target}',
+          _toAll ? 'Broadcast sent to all users' : 'Broadcast sent to $target',
         ),
         backgroundColor: AC.bg3,
         behavior: SnackBarBehavior.floating,
@@ -331,12 +307,9 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
     _titleCtrl.clear();
     _messageCtrl.clear();
     if (!_toAll) _emailCtrl.clear();
-    setState(() {
-      if (!_toAll) _selectedEmail = null;
-    });
   }
 
-  void _confirmDelete(_BroadcastRecord record) {
+  void _confirmDelete(BroadcastRecord record) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -353,9 +326,10 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
             child: Text('Cancel', style: AT.body.copyWith(color: AC.textMuted)),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(ctx).pop();
-              setState(() => _history.remove(record));
+              await DB.deleteBroadcastRecord(record.id);
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('Broadcast deleted'),
@@ -374,7 +348,7 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
     );
   }
 
-  void _showDetail(_BroadcastRecord record) {
+  void _showDetail(BroadcastRecord record) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -384,26 +358,10 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
   }
 }
 
-// ── Data model ────────────────────────────────────────────────────────────────
-
-class _BroadcastRecord {
-  final String title;
-  final String message;
-  final String recipient;
-  final DateTime sentAt;
-
-  _BroadcastRecord({
-    required this.title,
-    required this.message,
-    required this.recipient,
-    required this.sentAt,
-  });
-}
-
 // ── Detail bottom sheet ───────────────────────────────────────────────────────
 
 class _BroadcastDetailSheet extends StatelessWidget {
-  final _BroadcastRecord record;
+  final BroadcastRecord record;
 
   const _BroadcastDetailSheet({required this.record});
 
@@ -444,7 +402,6 @@ class _BroadcastDetailSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle
           Center(
             child: Container(
               width: 40,
@@ -456,8 +413,6 @@ class _BroadcastDetailSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Title row
           Row(
             children: [
               Container(
@@ -471,14 +426,10 @@ class _BroadcastDetailSheet extends StatelessWidget {
                     color: AC.cyan, size: 22),
               ),
               const SizedBox(width: 14),
-              Expanded(
-                child: Text(record.title, style: AT.heading),
-              ),
+              Expanded(child: Text(record.title, style: AT.heading)),
             ],
           ),
           const SizedBox(height: 20),
-
-          // Info chips row
           Row(
             children: [
               _InfoChip(
@@ -493,16 +444,10 @@ class _BroadcastDetailSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-
-          // Divider
           Divider(color: AC.border, thickness: 1),
           const SizedBox(height: 16),
-
-          // Message label
           Text('MESSAGE', style: AT.caption.copyWith(letterSpacing: 1.2)),
           const SizedBox(height: 10),
-
-          // Message body
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -510,8 +455,6 @@ class _BroadcastDetailSheet extends StatelessWidget {
             child: Text(record.message, style: AT.body),
           ),
           const SizedBox(height: 24),
-
-          // Close button
           GradButton(
             label: 'CLOSE',
             width: double.infinity,
@@ -557,7 +500,7 @@ class _InfoChip extends StatelessWidget {
 // ── History tile ──────────────────────────────────────────────────────────────
 
 class _BroadcastHistoryTile extends StatelessWidget {
-  final _BroadcastRecord record;
+  final BroadcastRecord record;
   final VoidCallback onDelete;
   final VoidCallback onTap;
 
@@ -586,7 +529,6 @@ class _BroadcastHistoryTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon
             Container(
               width: 36,
               height: 36,
@@ -598,7 +540,6 @@ class _BroadcastHistoryTile extends StatelessWidget {
                   const Icon(Icons.campaign_rounded, color: AC.cyan, size: 18),
             ),
             const SizedBox(width: 12),
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,7 +570,6 @@ class _BroadcastHistoryTile extends StatelessWidget {
                 ],
               ),
             ),
-            // Three-dot menu
             PopupMenuButton<String>(
               color: AC.bg3,
               shape: RoundedRectangleBorder(

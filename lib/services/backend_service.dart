@@ -21,6 +21,8 @@ class BackendService {
       _db.collection('tournaments');
   CollectionReference<Map<String, dynamic>> get _notifications =>
       _db.collection('notifications');
+  CollectionReference<Map<String, dynamic>> get _broadcasts =>
+      _db.collection('broadcasts');
 
   bool _bootstrapped = false;
 
@@ -180,6 +182,8 @@ class BackendService {
     return sha256.convert(utf8.encode(password)).toString();
   }
 
+  // ─── Tournaments ──────────────────────────────────────────────────────────
+
   Stream<List<TournamentModel>> watchTournaments() {
     return _tournaments.snapshots().map((snapshot) {
       final tournaments = snapshot.docs
@@ -232,6 +236,8 @@ class BackendService {
       ),
     );
   }
+
+  // ─── Teams ────────────────────────────────────────────────────────────────
 
   Stream<TeamModel?> watchTeamByOwner(String ownerEmail) {
     final normalizedEmail = _normalizeEmail(ownerEmail);
@@ -393,6 +399,8 @@ class BackendService {
     }
   }
 
+  // ─── Users ────────────────────────────────────────────────────────────────
+
   Future<UserModel?> getUserProfile(String email) async {
     final doc = await _users.doc(_normalizeEmail(email)).get();
     if (!doc.exists || doc.data() == null) return null;
@@ -452,6 +460,8 @@ class BackendService {
     await batch.commit();
   }
 
+  // ─── Notifications ────────────────────────────────────────────────────────
+
   Stream<List<AppNotificationModel>> watchNotifications(String email) {
     return _notifications
         .where('userEmail', isEqualTo: _normalizeEmail(email))
@@ -487,6 +497,8 @@ class BackendService {
     await _notifications.doc(notificationId).delete();
   }
 
+  // ─── Broadcasts ───────────────────────────────────────────────────────────
+
   Future<void> sendBroadcast({
     required String title,
     required String message,
@@ -518,6 +530,37 @@ class BackendService {
     await batch.commit();
   }
 
+  /// Save a broadcast history record so admins can see what was sent.
+  Future<void> saveBroadcastRecord(BroadcastRecord record) async {
+    await _broadcasts.doc(record.id).set(record.toMap());
+  }
+
+  /// Delete a broadcast history record.
+  Future<void> deleteBroadcastRecord(String id) async {
+    await _broadcasts.doc(id).delete();
+  }
+
+  /// Fetch all past broadcast records sorted newest-first.
+  Future<List<BroadcastRecord>> getBroadcastHistory() async {
+    final snapshot =
+        await _broadcasts.orderBy('sentAt', descending: true).get();
+    return snapshot.docs
+        .map((doc) => BroadcastRecord.fromMap(doc.data()))
+        .toList();
+  }
+
+  /// Real-time stream of broadcast history for the admin panel.
+  Stream<List<BroadcastRecord>> watchBroadcastHistory() {
+    return _broadcasts
+        .orderBy('sentAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => BroadcastRecord.fromMap(doc.data()))
+            .toList());
+  }
+
+  // ─── Utilities ────────────────────────────────────────────────────────────
+
   String formatRelativeTime(DateTime value) {
     final diff = DateTime.now().difference(value);
     if (diff.inMinutes < 1) return 'just now';
@@ -528,4 +571,38 @@ class BackendService {
     if (weeks < 5) return '${weeks}w ago';
     return '${value.day}/${value.month}/${value.year}';
   }
+}
+
+// ─── Broadcast Record Model ───────────────────────────────────────────────────
+
+class BroadcastRecord {
+  final String id;
+  final String title;
+  final String message;
+  final String recipient;
+  final DateTime sentAt;
+
+  BroadcastRecord({
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.recipient,
+    required this.sentAt,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'message': message,
+        'recipient': recipient,
+        'sentAt': sentAt.toIso8601String(),
+      };
+
+  factory BroadcastRecord.fromMap(Map<String, dynamic> map) => BroadcastRecord(
+        id: map['id'] ?? '',
+        title: map['title'] ?? '',
+        message: map['message'] ?? '',
+        recipient: map['recipient'] ?? '',
+        sentAt: DateTime.tryParse(map['sentAt'] ?? '') ?? DateTime.now(),
+      );
 }

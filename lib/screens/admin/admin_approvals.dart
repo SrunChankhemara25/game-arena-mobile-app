@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -14,13 +15,34 @@ class AdminApprovalsView extends StatefulWidget {
 class _AdminApprovalsViewState extends State<AdminApprovalsView> {
   GameCtx? _selectedGame;
   Tournament? _selectedTournament;
+  StreamSubscription<List<Tournament>>? _tournamentsSub;
 
   @override
   void initState() {
     super.initState();
     DB.initialize().then((_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      setState(() {});
+      // Subscribe to live tournament updates so approvals reflect changes instantly
+      _tournamentsSub = DB.watchTournaments().listen((tournaments) {
+        if (!mounted) return;
+        DB.tournaments = tournaments;
+        // Keep selected tournament in sync if it was updated
+        if (_selectedTournament != null) {
+          final updated = tournaments
+              .where((t) => t.id == _selectedTournament!.id)
+              .firstOrNull;
+          _selectedTournament = updated ?? _selectedTournament;
+        }
+        setState(() {});
+      });
     });
+  }
+
+  @override
+  void dispose() {
+    _tournamentsSub?.cancel();
+    super.dispose();
   }
 
   @override

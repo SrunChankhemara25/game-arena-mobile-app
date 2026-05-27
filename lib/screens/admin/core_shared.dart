@@ -798,6 +798,40 @@ class DB {
     );
   }
 
+  /// Save a broadcast record so history persists across sessions.
+  static Future<void> saveBroadcastRecord(BroadcastRecord record) async {
+    await BackendService.instance.saveBroadcastRecord(record);
+  }
+
+  /// Delete a broadcast history record by id.
+  static Future<void> deleteBroadcastRecord(String id) async {
+    await BackendService.instance.deleteBroadcastRecord(id);
+  }
+
+  /// Fetch all past broadcast records (newest first).
+  static Future<List<BroadcastRecord>> getBroadcastHistory() async {
+    return BackendService.instance.getBroadcastHistory();
+  }
+
+  /// Real-time stream of broadcast history.
+  static Stream<List<BroadcastRecord>> watchBroadcastHistory() {
+    return BackendService.instance.watchBroadcastHistory();
+  }
+
+  /// Real-time stream of all users — use in StreamBuilder for live updates.
+  static Stream<List<AppUser>> watchUsers() {
+    return BackendService.instance.watchUsers().map(
+          (profiles) => profiles.map(_userFromProfile).toList(),
+        );
+  }
+
+  /// Real-time stream of all tournaments — use in StreamBuilder for live updates.
+  static Stream<List<Tournament>> watchTournaments() {
+    return BackendService.instance.watchTournaments().map(
+          (models) => models.map(_tournamentFromModel).toList(),
+        );
+  }
+
   static AppUser _userFromProfile(UserModel user) {
     return AppUser(
       id: user.id,
