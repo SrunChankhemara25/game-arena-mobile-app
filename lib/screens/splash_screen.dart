@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +21,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _entranceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -37,9 +40,14 @@ class _SplashScreenState extends State<SplashScreen> {
     _runEntranceSequence();
   }
 
-  Future<void> _runEntranceSequence() async {
-    await Future.delayed(const Duration(milliseconds: 2500));
+  void _runEntranceSequence() {
+    _entranceTimer = Timer(
+      const Duration(milliseconds: 2500),
+      _routeNext,
+    );
+  }
 
+  Future<void> _routeNext() async {
     if (mounted) {
       HapticFeedback.mediumImpact();
       final savedEmail = await AuthService().getLoggedInUserEmail();
@@ -70,6 +78,12 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _entranceTimer?.cancel();
+    super.dispose();
   }
 
   @override

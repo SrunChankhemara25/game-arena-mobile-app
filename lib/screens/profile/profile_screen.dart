@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../models/models.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend_service.dart';
+import '../../services/media_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common/widgets.dart';
 import '../admin/admin_dashboard.dart' as admin_dashboard;
@@ -546,6 +547,11 @@ class _IdentityBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final avatarImage = MediaService.imageProviderFor(user.avatarUrl);
+    final initial = user.name.trim().isNotEmpty
+        ? user.name.trim().substring(0, 1).toUpperCase()
+        : 'U';
+
     return AnimatedBuilder(
       animation: entranceCtrl,
       builder: (_, child) => Transform.translate(
@@ -612,23 +618,33 @@ class _IdentityBlock extends StatelessWidget {
                                 ),
                                 child: Stack(
                                   children: [
-                                    Center(
-                                      child: ShaderMask(
-                                        shaderCallback: (b) => AppColors
-                                            .gradientCyan
-                                            .createShader(b),
-                                        child: Text(
-                                          user.name
-                                              .substring(0, 1)
-                                              .toUpperCase(),
-                                          style: AppText.displaySm.copyWith(
-                                            color: Colors.white,
-                                            fontSize: 36,
-                                            fontWeight: FontWeight.w900,
+                                    if (avatarImage != null)
+                                      Positioned.fill(
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(18),
+                                          child: Image(
+                                            image: avatarImage,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Center(
+                                        child: ShaderMask(
+                                          shaderCallback: (b) => AppColors
+                                              .gradientCyan
+                                              .createShader(b),
+                                          child: Text(
+                                            initial,
+                                            style: AppText.displaySm.copyWith(
+                                              color: Colors.white,
+                                              fontSize: 36,
+                                              fontWeight: FontWeight.w900,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
                                     Positioned(
                                       bottom: 6,
                                       right: 6,
@@ -1341,6 +1357,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _bioController;
   late TextEditingController _countryController;
+  String? _avatarUrl;
 
   @override
   void initState() {
@@ -1348,6 +1365,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController = TextEditingController(text: widget.user.name);
     _bioController = TextEditingController(text: widget.user.bio ?? '');
     _countryController = TextEditingController(text: widget.user.country);
+    _avatarUrl = widget.user.avatarUrl;
   }
 
   @override
@@ -1369,6 +1387,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       name: _nameController.text.trim(),
       country: _countryController.text.trim(),
       bio: _bioController.text.trim(),
+      avatarUrl: _avatarUrl,
     );
     if (!mounted) return;
     Navigator.pop(context, true);
@@ -1377,9 +1396,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  Future<void> _pickAvatar() async {
+    HapticFeedback.lightImpact();
+    final picked =
+        await MediaService.pickImage(maxWidth: 512, imageQuality: 72);
+    if (picked == null || !mounted) return;
+    setState(() => _avatarUrl = picked.dataUrl);
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top + kToolbarHeight;
+    final avatarImage = MediaService.imageProviderFor(_avatarUrl);
 
     return Scaffold(
       backgroundColor: AppColors.bg0,
@@ -1409,7 +1437,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               Center(
                 child: GestureDetector(
-                  onTap: () => HapticFeedback.lightImpact(),
+                  onTap: _pickAvatar,
                   child: Stack(
                     children: [
                       Container(
@@ -1424,16 +1452,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 color: AppColors.cyan.withOpacity(0.2),
                                 blurRadius: 16)
                           ],
+                          image: avatarImage == null
+                              ? null
+                              : DecorationImage(
+                                  image: avatarImage,
+                                  fit: BoxFit.cover,
+                                ),
                         ),
-                        child: Center(
-                          child: Text(
-                            widget.user.name.isNotEmpty
-                                ? widget.user.name.substring(0, 1).toUpperCase()
-                                : 'U',
-                            style: AppText.displaySm
-                                .copyWith(color: AppColors.cyan, fontSize: 40),
-                          ),
-                        ),
+                        child: avatarImage == null
+                            ? Center(
+                                child: Text(
+                                  _nameController.text.trim().isNotEmpty
+                                      ? _nameController.text
+                                          .trim()
+                                          .substring(0, 1)
+                                          .toUpperCase()
+                                      : 'U',
+                                  style: AppText.displaySm.copyWith(
+                                      color: AppColors.cyan, fontSize: 40),
+                                ),
+                              )
+                            : null,
                       ),
                       Positioned(
                         bottom: 0,

@@ -253,6 +253,10 @@ class _GameSelectionState extends State<_GameSelection>
         final tournaments = DB.tournaments
             .where((tournament) => tournament.game == game)
             .toList();
+        final logoUrl = tournaments
+            .map((tournament) => tournament.resolvedLogoUrl)
+            .whereType<String>()
+            .firstOrNull;
         final pending = tournaments.fold<int>(
           0,
           (count, tournament) => count + tournament.pendingCount,
@@ -285,7 +289,7 @@ class _GameSelectionState extends State<_GameSelection>
                 child: Row(
                   children: [
                     AdminLogoBadge(
-                      imageUrl: defaultGameLogoUrl(game),
+                      imageUrl: logoUrl ?? defaultGameLogoUrl(game),
                       fallback: game.label,
                       size: 46,
                       radius: 14,

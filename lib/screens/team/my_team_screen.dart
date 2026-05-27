@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend_service.dart';
+import '../../services/media_service.dart';
 import '../../theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../widgets/common/widgets.dart';
@@ -113,6 +114,10 @@ class _MyTeamScreenState extends State<MyTeamScreen>
   }
 
   void _editTeamName() async {
+    if (_myTeam?.registeredTournamentIds.isNotEmpty == true) {
+      _showLockedTeamSnack();
+      return;
+    }
     final ctrl = TextEditingController(text: _myTeam?.name ?? '');
     final result = await showDialog<String>(
       context: context,
@@ -225,7 +230,7 @@ class _MyTeamScreenState extends State<MyTeamScreen>
               color: AppColors.purple,
               onTap: () {
                 Navigator.pop(context);
-                // Logo picker — image_picker integration point
+                _changeTeamLogo();
               },
             ),
             const SizedBox(height: 12),
@@ -292,6 +297,30 @@ class _MyTeamScreenState extends State<MyTeamScreen>
                       ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _changeTeamLogo() async {
+    final team = _myTeam;
+    if (team == null) return;
+    if (team.registeredTournamentIds.isNotEmpty) {
+      _showLockedTeamSnack();
+      return;
+    }
+    HapticFeedback.lightImpact();
+    final picked =
+        await MediaService.pickImage(maxWidth: 640, imageQuality: 76);
+    if (picked == null) return;
+    await _persistTeam(team.copyWith(logoUrl: picked.dataUrl));
+  }
+
+  void _showLockedTeamSnack() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'This team is locked after tournament registration. Admin can update approved rosters.',
+        ),
       ),
     );
   }
@@ -491,6 +520,7 @@ class _HasTeamView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final logoImage = MediaService.imageProviderFor(team.logoUrl);
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(24).copyWith(bottom: 120),
@@ -511,20 +541,25 @@ class _HasTeamView extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                         color: AppColors.cyan.withOpacity(0.5), width: 2),
+                    image: logoImage == null
+                        ? null
+                        : DecorationImage(image: logoImage, fit: BoxFit.cover),
                   ),
-                  child: Center(
-                    child: ShaderMask(
-                      shaderCallback: (b) =>
-                          AppColors.gradientCyan.createShader(b),
-                      child: Text(
-                        team.name.length >= 2
-                            ? team.name.substring(0, 2).toUpperCase()
-                            : team.name.toUpperCase(),
-                        style: AppText.displaySm
-                            .copyWith(color: Colors.white, fontSize: 28),
-                      ),
-                    ),
-                  ),
+                  child: logoImage == null
+                      ? Center(
+                          child: ShaderMask(
+                            shaderCallback: (b) =>
+                                AppColors.gradientCyan.createShader(b),
+                            child: Text(
+                              team.name.length >= 2
+                                  ? team.name.substring(0, 2).toUpperCase()
+                                  : team.name.toUpperCase(),
+                              style: AppText.displaySm
+                                  .copyWith(color: Colors.white, fontSize: 28),
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -578,7 +613,9 @@ class _HasTeamView extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                   child: StatCard(
-                      label: 'Events', value: '3', valueColor: AppColors.cyan)),
+                      label: 'Events',
+                      value: '${team.registeredTournamentIds.length}',
+                      valueColor: AppColors.cyan)),
             ],
           ),
           const SizedBox(height: 24),
@@ -594,8 +631,10 @@ class _HasTeamView extends StatelessWidget {
               final updated = await Navigator.push<TeamModel>(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      TeamDetailScreen(team: team, isViewOnly: false),
+                  builder: (_) => TeamDetailScreen(
+                    team: team,
+                    isViewOnly: team.registeredTournamentIds.isNotEmpty,
+                  ),
                 ),
               );
               if (updated != null) {
@@ -686,6 +725,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
   String _country = 'Cambodia';
   final List<Map<String, dynamic>> _players = [];
   File? _teamLogo;
+  String? _teamLogoUrl;
 
   final _countries = [
     'Cambodia',
@@ -764,6 +804,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
         name: _teamName.text.trim(),
         game: _resolveGameTitle(),
         players: _players.map(_mapPlayerToModel).toList(),
+        logoUrl: _teamLogoUrl,
         status: TeamStatus.pending,
         country: _country.trim().isEmpty ? null : _country.trim(),
         contactEmail: _contactEmail.text.trim(),
@@ -824,6 +865,13 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 
   Future<void> _pickLogo() async {
     HapticFeedback.lightImpact();
+    final picked =
+        await MediaService.pickImage(maxWidth: 640, imageQuality: 76);
+    if (picked == null) return;
+    setState(() {
+      _teamLogoUrl = picked.dataUrl;
+      _teamLogo = picked.path == null ? null : File(picked.path!);
+    });
   }
 
   @override
@@ -976,6 +1024,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
                   country: _country,
                   countries: _countries,
                   teamLogo: _teamLogo,
+                  teamLogoUrl: _teamLogoUrl,
                   onLogoTap: _pickLogo,
                   onGameChanged: (g) {
                     HapticFeedback.selectionClick();
@@ -1013,6 +1062,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
                   email: _contactEmail.text,
                   playerCount: _players.length,
                   teamLogo: _teamLogo,
+                  teamLogoUrl: _teamLogoUrl,
                 ),
               ],
             ),
@@ -1061,6 +1111,7 @@ class _Step1TeamInfo extends StatefulWidget {
   final String country;
   final List<String> countries;
   final File? teamLogo;
+  final String? teamLogoUrl;
   final VoidCallback onLogoTap;
   final ValueChanged<GameTitle> onGameChanged;
   final ValueChanged<bool> onCustomGameToggled;
@@ -1078,6 +1129,7 @@ class _Step1TeamInfo extends StatefulWidget {
     required this.country,
     required this.countries,
     required this.teamLogo,
+    required this.teamLogoUrl,
     required this.onLogoTap,
     required this.onGameChanged,
     required this.onCustomGameToggled,
@@ -1119,6 +1171,10 @@ class _Step1TeamInfoState extends State<_Step1TeamInfo> {
 
   @override
   Widget build(BuildContext context) {
+    final logoImage = widget.teamLogo != null
+        ? FileImage(widget.teamLogo!) as ImageProvider
+        : MediaService.imageProviderFor(widget.teamLogoUrl);
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(24),
@@ -1147,12 +1203,12 @@ class _Step1TeamInfoState extends State<_Step1TeamInfo> {
                     shape: BoxShape.circle,
                     color: AppColors.bg3.withOpacity(0.5),
                     border: Border.all(
-                      color: widget.teamLogo != null
+                      color: logoImage != null
                           ? AppColors.cyan
                           : AppColors.border.withOpacity(0.6),
-                      width: widget.teamLogo != null ? 2.5 : 1.5,
+                      width: logoImage != null ? 2.5 : 1.5,
                     ),
-                    boxShadow: widget.teamLogo != null
+                    boxShadow: logoImage != null
                         ? [
                             BoxShadow(
                                 color: AppColors.cyan.withOpacity(0.25),
@@ -1160,14 +1216,11 @@ class _Step1TeamInfoState extends State<_Step1TeamInfo> {
                                 spreadRadius: 2)
                           ]
                         : [],
-                    image: widget.teamLogo != null
-                        ? DecorationImage(
-                            image: FileImage(widget.teamLogo!),
-                            fit: BoxFit.cover,
-                          )
+                    image: logoImage != null
+                        ? DecorationImage(image: logoImage, fit: BoxFit.cover)
                         : null,
                   ),
-                  child: widget.teamLogo == null
+                  child: logoImage == null
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -1494,6 +1547,7 @@ class _Step3Review extends StatelessWidget {
   final String customGameName;
   final int playerCount;
   final File? teamLogo;
+  final String? teamLogoUrl;
 
   const _Step3Review({
     required this.teamName,
@@ -1504,6 +1558,7 @@ class _Step3Review extends StatelessWidget {
     required this.email,
     required this.playerCount,
     required this.teamLogo,
+    required this.teamLogoUrl,
   });
 
   @override
@@ -1511,6 +1566,9 @@ class _Step3Review extends StatelessWidget {
     final String gameDisplay = isCustomGame
         ? '✏️ ${customGameName.isEmpty ? 'Custom' : customGameName}'
         : '${game.emoji} ${game.label}';
+    final logoImage = teamLogo != null
+        ? FileImage(teamLogo!) as ImageProvider
+        : MediaService.imageProviderFor(teamLogoUrl);
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -1525,7 +1583,7 @@ class _Step3Review extends StatelessWidget {
           Text('Review your parameters before final transmission.',
               style: AppText.body),
           const SizedBox(height: 32),
-          if (teamLogo != null) ...[
+          if (logoImage != null) ...[
             Center(
               child: Container(
                 width: 80,
@@ -1535,7 +1593,7 @@ class _Step3Review extends StatelessWidget {
                   border: Border.all(
                       color: AppColors.cyan.withOpacity(0.5), width: 2),
                   image: DecorationImage(
-                    image: FileImage(teamLogo!),
+                    image: logoImage,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -1591,7 +1649,7 @@ class _Step3Review extends StatelessWidget {
                 _ReviewRow(
                     icon: Icons.image_rounded,
                     label: 'Logo',
-                    value: teamLogo != null ? 'Uploaded ✓' : 'Not provided'),
+                    value: logoImage != null ? 'Uploaded ✓' : 'Not provided'),
               ],
             ),
           ),

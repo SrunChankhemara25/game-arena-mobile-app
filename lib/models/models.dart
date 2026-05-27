@@ -1,5 +1,7 @@
 // lib/models/models.dart
 
+const Object _unset = Object();
+
 // ─── Tournament Status ────────────────────────────────────────────────────────
 enum TournamentStatus {
   ongoing,
@@ -267,51 +269,75 @@ class TeamModel {
   TeamModel copyWith({
     String? id,
     String? name,
-    String? logoUrl,
+    Object? logoUrl = _unset,
     GameTitle? game,
     List<PlayerModel>? players,
     TeamStatus? status,
-    String? country,
-    String? captainId,
-    String? contactInfo,
-    DateTime? createdAt,
+    Object? country = _unset,
+    Object? captainId = _unset,
+    Object? contactInfo = _unset,
+    Object? createdAt = _unset,
     int? wins,
     int? losses,
-    String? description,
-    String? contactEmail,
-    String? socialLink,
-    String? teamTag,
-    String? ownerEmail,
-    String? founderName,
-    String? managerName,
-    String? coachName,
-    String? assistantCoachName,
-    String? contactPhone,
+    Object? description = _unset,
+    Object? contactEmail = _unset,
+    Object? socialLink = _unset,
+    Object? teamTag = _unset,
+    Object? ownerEmail = _unset,
+    Object? founderName = _unset,
+    Object? managerName = _unset,
+    Object? coachName = _unset,
+    Object? assistantCoachName = _unset,
+    Object? contactPhone = _unset,
     List<String>? registeredTournamentIds,
   }) =>
       TeamModel(
         id: id ?? this.id,
         name: name ?? this.name,
-        logoUrl: logoUrl ?? this.logoUrl,
+        logoUrl: identical(logoUrl, _unset) ? this.logoUrl : logoUrl as String?,
         game: game ?? this.game,
         players: players ?? this.players,
         status: status ?? this.status,
-        country: country ?? this.country,
-        captainId: captainId ?? this.captainId,
-        contactInfo: contactInfo ?? this.contactInfo,
-        createdAt: createdAt ?? this.createdAt,
+        country: identical(country, _unset) ? this.country : country as String?,
+        captainId: identical(captainId, _unset)
+            ? this.captainId
+            : captainId as String?,
+        contactInfo: identical(contactInfo, _unset)
+            ? this.contactInfo
+            : contactInfo as String?,
+        createdAt: identical(createdAt, _unset)
+            ? this.createdAt
+            : createdAt as DateTime?,
         wins: wins ?? this.wins,
         losses: losses ?? this.losses,
-        description: description ?? this.description,
-        contactEmail: contactEmail ?? this.contactEmail,
-        socialLink: socialLink ?? this.socialLink,
-        teamTag: teamTag ?? this.teamTag,
-        ownerEmail: ownerEmail ?? this.ownerEmail,
-        founderName: founderName ?? this.founderName,
-        managerName: managerName ?? this.managerName,
-        coachName: coachName ?? this.coachName,
-        assistantCoachName: assistantCoachName ?? this.assistantCoachName,
-        contactPhone: contactPhone ?? this.contactPhone,
+        description: identical(description, _unset)
+            ? this.description
+            : description as String?,
+        contactEmail: identical(contactEmail, _unset)
+            ? this.contactEmail
+            : contactEmail as String?,
+        socialLink: identical(socialLink, _unset)
+            ? this.socialLink
+            : socialLink as String?,
+        teamTag: identical(teamTag, _unset) ? this.teamTag : teamTag as String?,
+        ownerEmail: identical(ownerEmail, _unset)
+            ? this.ownerEmail
+            : ownerEmail as String?,
+        founderName: identical(founderName, _unset)
+            ? this.founderName
+            : founderName as String?,
+        managerName: identical(managerName, _unset)
+            ? this.managerName
+            : managerName as String?,
+        coachName: identical(coachName, _unset)
+            ? this.coachName
+            : coachName as String?,
+        assistantCoachName: identical(assistantCoachName, _unset)
+            ? this.assistantCoachName
+            : assistantCoachName as String?,
+        contactPhone: identical(contactPhone, _unset)
+            ? this.contactPhone
+            : contactPhone as String?,
         registeredTournamentIds:
             registeredTournamentIds ?? this.registeredTournamentIds,
       );
@@ -392,6 +418,7 @@ class MatchModel {
   final String round;
   final String? winnerId;
   final String? scheduledAt;
+  final String? venue;
 
   const MatchModel({
     required this.id,
@@ -404,6 +431,7 @@ class MatchModel {
     this.round = 'Round 1',
     this.winnerId,
     this.scheduledAt,
+    this.venue,
   });
 
   Map<String, dynamic> toMap() => {
@@ -417,6 +445,7 @@ class MatchModel {
         'round': round,
         'winnerId': winnerId,
         'scheduledAt': scheduledAt,
+        'venue': venue,
       };
 
   factory MatchModel.fromMap(Map<String, dynamic> map) => MatchModel(
@@ -430,6 +459,7 @@ class MatchModel {
         round: map['round'] ?? 'Round 1',
         winnerId: map['winnerId'],
         scheduledAt: map['scheduledAt'],
+        venue: map['venue'],
       );
 }
 
@@ -485,29 +515,33 @@ class UserModel {
     String? id,
     String? name,
     String? email,
-    String? country,
+    Object? country = _unset,
     UserRole? role,
-    String? bio,
-    String? avatarUrl,
+    Object? bio = _unset,
+    Object? avatarUrl = _unset,
     String? status,
     bool? notificationsEnabled,
     bool? emailUpdatesEnabled,
-    String? teamId,
-    DateTime? createdAt,
+    Object? teamId = _unset,
+    Object? createdAt = _unset,
   }) =>
       UserModel(
         id: id ?? this.id,
         name: name ?? this.name,
         email: email ?? this.email,
-        country: country ?? this.country,
+        country: identical(country, _unset) ? this.country : country as String?,
         role: role ?? this.role,
-        bio: bio ?? this.bio,
-        avatarUrl: avatarUrl ?? this.avatarUrl,
+        bio: identical(bio, _unset) ? this.bio : bio as String?,
+        avatarUrl: identical(avatarUrl, _unset)
+            ? this.avatarUrl
+            : avatarUrl as String?,
         status: status ?? this.status,
         notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
         emailUpdatesEnabled: emailUpdatesEnabled ?? this.emailUpdatesEnabled,
-        teamId: teamId ?? this.teamId,
-        createdAt: createdAt ?? this.createdAt,
+        teamId: identical(teamId, _unset) ? this.teamId : teamId as String?,
+        createdAt: identical(createdAt, _unset)
+            ? this.createdAt
+            : createdAt as DateTime?,
       );
 
   Map<String, dynamic> toMap() => {
@@ -739,25 +773,25 @@ class TournamentModel {
     GameTitle? game,
     TournamentStatus? status,
     TournamentFormat? format,
-    String? description,
-    int? prizePool,
+    Object? description = _unset,
+    Object? prizePool = _unset,
     int? maxTeams,
     int? registeredTeams,
     List<MatchModel>? matches,
-    DateTime? startDate,
-    DateTime? endDate,
-    String? organizerId,
-    String? bannerUrl,
-    String? logoUrl,
+    Object? startDate = _unset,
+    Object? endDate = _unset,
+    Object? organizerId = _unset,
+    Object? bannerUrl = _unset,
+    Object? logoUrl = _unset,
     bool? isVerified,
     bool? isFeatured,
     List<TeamModel>? teams,
     List<StandingModel>? standings,
-    String? organizer,
-    String? location,
-    DateTime? registrationDeadline,
+    Object? organizer = _unset,
+    Object? location = _unset,
+    Object? registrationDeadline = _unset,
     String? type,
-    String? requirements,
+    Object? requirements = _unset,
     bool? isArchived,
   }) =>
       TournamentModel(
@@ -766,25 +800,42 @@ class TournamentModel {
         game: game ?? this.game,
         status: status ?? this.status,
         format: format ?? this.format,
-        description: description ?? this.description,
-        prizePool: prizePool ?? this.prizePool,
+        description: identical(description, _unset)
+            ? this.description
+            : description as String?,
+        prizePool:
+            identical(prizePool, _unset) ? this.prizePool : prizePool as int?,
         maxTeams: maxTeams ?? this.maxTeams,
         registeredTeams: registeredTeams ?? this.registeredTeams,
         matches: matches ?? this.matches,
-        startDate: startDate ?? this.startDate,
-        endDate: endDate ?? this.endDate,
-        organizerId: organizerId ?? this.organizerId,
-        bannerUrl: bannerUrl ?? this.bannerUrl,
-        logoUrl: logoUrl ?? this.logoUrl,
+        startDate: identical(startDate, _unset)
+            ? this.startDate
+            : startDate as DateTime?,
+        endDate:
+            identical(endDate, _unset) ? this.endDate : endDate as DateTime?,
+        organizerId: identical(organizerId, _unset)
+            ? this.organizerId
+            : organizerId as String?,
+        bannerUrl: identical(bannerUrl, _unset)
+            ? this.bannerUrl
+            : bannerUrl as String?,
+        logoUrl: identical(logoUrl, _unset) ? this.logoUrl : logoUrl as String?,
         isVerified: isVerified ?? this.isVerified,
         isFeatured: isFeatured ?? this.isFeatured,
         teams: teams ?? this.teams,
         standings: standings ?? this.standings,
-        organizer: organizer ?? this.organizer,
-        location: location ?? this.location,
-        registrationDeadline: registrationDeadline ?? this.registrationDeadline,
+        organizer: identical(organizer, _unset)
+            ? this.organizer
+            : organizer as String?,
+        location:
+            identical(location, _unset) ? this.location : location as String?,
+        registrationDeadline: identical(registrationDeadline, _unset)
+            ? this.registrationDeadline
+            : registrationDeadline as DateTime?,
         type: type ?? this.type,
-        requirements: requirements ?? this.requirements,
+        requirements: identical(requirements, _unset)
+            ? this.requirements
+            : requirements as String?,
         isArchived: isArchived ?? this.isArchived,
       );
 

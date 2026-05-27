@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../services/media_service.dart';
 import 'core_shared.dart';
 
 // ── Main Tournaments List Screen ─────────────────────────────────────────────
@@ -1183,6 +1184,27 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: OutlineBtn(
+                          label: 'Device',
+                          color: AC.violet,
+                          icon: Icons.add_photo_alternate_rounded,
+                          onTap: () async {
+                            final picked = await MediaService.pickImage(
+                              maxWidth: 640,
+                              imageQuality: 76,
+                            );
+                            if (picked == null) return;
+                            draftCtrl.text = picked.dataUrl;
+                            setModalState(() {});
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlineBtn(
                           label: 'Clear',
                           color: AC.textSecondary,
                           icon: Icons.close_rounded,
@@ -1248,9 +1270,13 @@ class _AdminTournamentDetailScreenState
 
   @override
   void dispose() {
-    DB.saveTournament(widget.tournament);
     _tabCtrl.dispose();
     super.dispose();
+  }
+
+  void _persistTournament() {
+    setState(() {});
+    DB.saveTournament(widget.tournament);
   }
 
   @override
@@ -1375,19 +1401,19 @@ class _AdminTournamentDetailScreenState
           _TournamentOverviewTab(tournament: tournament),
           _TournamentTeamsTab(
             tournament: tournament,
-            onChanged: () => setState(() {}),
+            onChanged: _persistTournament,
           ),
           _TournamentScheduleTab(
             tournament: tournament,
-            onChanged: () => setState(() {}),
+            onChanged: _persistTournament,
           ),
           _TournamentBracketTab(
             tournament: tournament,
-            onChanged: () => setState(() {}),
+            onChanged: _persistTournament,
           ),
           _TournamentStandingsTab(
             tournament: tournament,
-            onChanged: () => setState(() {}),
+            onChanged: _persistTournament,
           ),
         ],
       ),

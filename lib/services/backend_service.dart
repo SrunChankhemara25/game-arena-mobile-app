@@ -1,9 +1,5 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:crypto/crypto.dart';
 
-import '../data/mock_data.dart';
 import '../models/models.dart';
 
 class BackendService {
@@ -28,159 +24,10 @@ class BackendService {
 
   Future<void> bootstrap() async {
     if (_bootstrapped) return;
-    await _seedUsers();
-    await _seedTeams();
-    await _seedTournaments();
     _bootstrapped = true;
   }
 
-  Future<void> _seedUsers() async {
-    const users = <Map<String, dynamic>>[
-      {
-        'email': 'admin@gamearena.gg',
-        'name': 'Nova Admin',
-        'country': 'Cambodia',
-        'role': 'admin',
-        'status': 'active',
-        'password': 'admin123',
-      },
-      {
-        'email': 'player@gamearena.gg',
-        'name': 'Vortex Striker',
-        'country': 'Cambodia',
-        'role': 'user',
-        'status': 'active',
-        'password': 'player123',
-      },
-      {
-        'email': 'manager@gamearena.gg',
-        'name': 'Arena Manager',
-        'country': 'Philippines',
-        'role': 'organizer',
-        'status': 'active',
-        'password': 'manager123',
-      },
-    ];
-
-    final batch = _db.batch();
-    var hasWrites = false;
-
-    for (final seed in users) {
-      final email = _normalizeEmail(seed['email'] as String);
-      final ref = _users.doc(email);
-      final snap = await ref.get();
-      if (snap.exists) continue;
-      hasWrites = true;
-      batch.set(ref, {
-        'id': email,
-        'email': email,
-        'name': seed['name'],
-        'country': seed['country'],
-        'role': seed['role'],
-        'status': seed['status'],
-        'bio': '',
-        'avatarUrl': null,
-        'teamId': null,
-        'notificationsEnabled': true,
-        'emailUpdatesEnabled': true,
-        'createdAt': DateTime.now().toIso8601String(),
-        'password': _hashPassword(seed['password'] as String),
-      });
-    }
-
-    if (hasWrites) {
-      await batch.commit();
-    }
-  }
-
-  Future<void> _seedTeams() async {
-    final snapshot = await _teams.limit(1).get();
-    if (snapshot.docs.isNotEmpty) return;
-
-    final batch = _db.batch();
-    for (final team in MockData.teams) {
-      batch.set(_teams.doc(team.id), team.toMap());
-    }
-    await batch.commit();
-  }
-
-  Future<void> _seedTournaments() async {
-    final snapshot = await _tournaments.limit(1).get();
-    if (snapshot.docs.isNotEmpty) return;
-
-    final batch = _db.batch();
-    for (final tournament in MockData.tournaments.map(_decorateTournament)) {
-      batch.set(_tournaments.doc(tournament.id), tournament.toMap());
-    }
-    await batch.commit();
-  }
-
-  TournamentModel _decorateTournament(TournamentModel tournament) {
-    final teams = tournament.teams
-        .map(
-          (team) => team.copyWith(
-            contactPhone: team.contactPhone ?? '',
-            coachName: team.coachName ?? _firstByType(team, PlayerType.coach),
-            assistantCoachName: team.assistantCoachName ??
-                _firstByType(team, PlayerType.assistantCoach),
-          ),
-        )
-        .toList();
-
-    return tournament.copyWith(
-      logoUrl: _defaultLogoForGame(tournament.game),
-      type: _defaultTypeForGame(tournament.game),
-      requirements: _defaultRequirementsForGame(tournament.game),
-      teams: teams,
-      registeredTeams: teams.length,
-      isArchived: tournament.status == TournamentStatus.ended,
-    );
-  }
-
-  String _firstByType(TeamModel team, PlayerType type) {
-    final player =
-        team.players.where((entry) => entry.type == type).firstOrNull;
-    return player?.fullName ?? player?.ign ?? '';
-  }
-
-  String _defaultTypeForGame(GameTitle game) {
-    switch (game) {
-      case GameTitle.pubg:
-      case GameTitle.freeFire:
-        return 'Squad';
-      default:
-        return '5v5';
-    }
-  }
-
-  String _defaultRequirementsForGame(GameTitle game) {
-    return 'Verified ${game.label} roster, valid player IDs, and an active team manager contact are required.';
-  }
-
-  String? _defaultLogoForGame(GameTitle game) {
-    switch (game) {
-      case GameTitle.mlbb:
-        return 'https://upload.wikimedia.org/wikipedia/en/thumb/9/90/Mobile_Legends_Bang_Bang_logo.png/320px-Mobile_Legends_Bang_Bang_logo.png';
-      case GameTitle.pubg:
-        return 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/PUBG_Mobile_logo.svg/320px-PUBG_Mobile_logo.svg.png';
-      case GameTitle.freeFire:
-        return 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Garena_Free_Fire_logo.svg/320px-Garena_Free_Fire_logo.svg.png';
-      case GameTitle.valorant:
-        return 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Valorant_logo_-_pink_color_version.svg/320px-Valorant_logo_-_pink_color_version.svg.png';
-      case GameTitle.cod:
-        return 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Call_of_Duty_Mobile_logo.svg/320px-Call_of_Duty_Mobile_logo.svg.png';
-      case GameTitle.eFootball:
-        return 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/EFootball_logo.svg/320px-EFootball_logo.svg.png';
-      case GameTitle.other:
-        return null;
-    }
-  }
-
   String _normalizeEmail(String email) => email.trim().toLowerCase();
-
-  String _hashPassword(String password) {
-    return sha256.convert(utf8.encode(password)).toString();
-  }
 
   // ─── Tournaments ──────────────────────────────────────────────────────────
 
@@ -218,11 +65,38 @@ class BackendService {
     final normalized = tournament.copyWith(
       registeredTeams: tournament.teams.length,
     );
-    await _tournaments.doc(normalized.id).set(normalized.toMap());
+    final batch = _db.batch();
+    batch.set(_tournaments.doc(normalized.id), normalized.toMap());
+    for (final team in normalized.teams) {
+      batch.set(_teams.doc(team.id), team.toMap(), SetOptions(merge: true));
+    }
+    await batch.commit();
   }
 
   Future<void> deleteTournament(String tournamentId) async {
-    await _tournaments.doc(tournamentId).delete();
+    final tournament = await getTournament(tournamentId);
+    final batch = _db.batch();
+    batch.delete(_tournaments.doc(tournamentId));
+
+    if (tournament != null) {
+      for (final team in tournament.teams) {
+        final savedTeam = await getTeam(team.id);
+        if (savedTeam == null) continue;
+        batch.set(
+          _teams.doc(team.id),
+          savedTeam
+              .copyWith(
+                registeredTournamentIds: savedTeam.registeredTournamentIds
+                    .where((id) => id != tournamentId)
+                    .toList(),
+              )
+              .toMap(),
+          SetOptions(merge: true),
+        );
+      }
+    }
+
+    await batch.commit();
   }
 
   Future<void> setTournamentArchived(
@@ -277,7 +151,10 @@ class BackendService {
   }
 
   Future<void> saveTeam(TeamModel team) async {
-    await _teams.doc(team.id).set(team.toMap());
+    final normalized = team.copyWith(
+      ownerEmail: team.ownerEmail?.trim().toLowerCase(),
+    );
+    await _teams.doc(normalized.id).set(normalized.toMap());
   }
 
   Future<void> deleteTeam(String teamId) async {
@@ -305,19 +182,40 @@ class BackendService {
     required TeamModel team,
   }) async {
     final tournament = await getTournament(tournamentId);
-    if (tournament == null) return;
+    if (tournament == null) {
+      throw Exception('Tournament not found.');
+    }
+    if (tournament.isArchived || tournament.status == TournamentStatus.ended) {
+      throw Exception('Tournament is not accepting registrations.');
+    }
+    if (tournament.registeredTeams >= tournament.maxTeams ||
+        tournament.teams.length >= tournament.maxTeams) {
+      throw Exception('Tournament is already full.');
+    }
+
+    final normalizedOwner = team.ownerEmail?.trim().toLowerCase();
+    final alreadyRegistered = tournament.teams.any((entry) {
+      final sameTeam = entry.id == team.id;
+      final sameOwner = normalizedOwner != null &&
+          normalizedOwner.isNotEmpty &&
+          entry.ownerEmail?.trim().toLowerCase() == normalizedOwner;
+      return sameTeam || sameOwner;
+    });
+    if (alreadyRegistered) {
+      throw Exception(
+          'This account is already registered for this tournament.');
+    }
 
     final normalizedTeam = team.copyWith(
       status: TeamStatus.pending,
+      ownerEmail: normalizedOwner,
       registeredTournamentIds: {
         ...team.registeredTournamentIds,
         tournamentId,
       }.toList(),
     );
 
-    final updatedTeams = tournament.teams
-        .where((entry) => entry.id != normalizedTeam.id)
-        .toList()
+    final updatedTeams = List<TeamModel>.from(tournament.teams)
       ..add(normalizedTeam);
 
     await saveTeam(normalizedTeam);
@@ -328,15 +226,15 @@ class BackendService {
       ),
     );
 
-    if (normalizedTeam.ownerEmail?.isNotEmpty == true) {
-      final owner = await getUserProfile(normalizedTeam.ownerEmail!);
+    if (normalizedOwner?.isNotEmpty == true) {
+      final owner = await getUserProfile(normalizedOwner!);
       if (owner != null) {
         await saveUserProfile(owner.copyWith(teamId: normalizedTeam.id));
       }
       await createNotification(
         AppNotificationModel(
           id: 'notif_${DateTime.now().millisecondsSinceEpoch}',
-          userEmail: normalizedTeam.ownerEmail!,
+          userEmail: normalizedOwner,
           title: 'Roster Submitted',
           body:
               '${normalizedTeam.name} is now pending review for ${tournament.title}.',
@@ -379,6 +277,11 @@ class BackendService {
     }
 
     if (team.ownerEmail?.isNotEmpty == true) {
+      final decision = switch (status) {
+        TeamStatus.approved => 'approved',
+        TeamStatus.rejected => 'rejected',
+        TeamStatus.pending => 'moved back to pending review',
+      };
       await createNotification(
         AppNotificationModel(
           id: 'notif_${DateTime.now().millisecondsSinceEpoch}',
@@ -388,8 +291,7 @@ class BackendService {
               : status == TeamStatus.rejected
                   ? 'Team Rejected'
                   : 'Review Updated',
-          body:
-              '${team.name} is now ${status.label.toLowerCase()} for ${tournament.title}.',
+          body: '${team.name} was $decision for ${tournament.title}.',
           type: 'approval',
           createdAt: DateTime.now(),
           tournamentId: tournament.id,
@@ -475,6 +377,11 @@ class BackendService {
     });
   }
 
+  Stream<int> watchUnreadNotificationCount(String email) {
+    return watchNotifications(email).map((items) =>
+        items.where((item) => !item.read && !item.archived).toList().length);
+  }
+
   Future<void> createNotification(AppNotificationModel notification) async {
     await _notifications.doc(notification.id).set(notification.toMap());
   }
@@ -540,6 +447,13 @@ class BackendService {
     await _broadcasts.doc(id).delete();
   }
 
+  Future<void> archiveBroadcastRecord(String id, bool archived) async {
+    await _broadcasts.doc(id).set(
+      {'archived': archived},
+      SetOptions(merge: true),
+    );
+  }
+
   /// Fetch all past broadcast records sorted newest-first.
   Future<List<BroadcastRecord>> getBroadcastHistory() async {
     final snapshot =
@@ -551,10 +465,8 @@ class BackendService {
 
   /// Real-time stream of broadcast history for the admin panel.
   Stream<List<BroadcastRecord>> watchBroadcastHistory() {
-    return _broadcasts
-        .orderBy('sentAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
+    return _broadcasts.orderBy('sentAt', descending: true).snapshots().map(
+        (snapshot) => snapshot.docs
             .map((doc) => BroadcastRecord.fromMap(doc.data()))
             .toList());
   }
@@ -581,6 +493,7 @@ class BroadcastRecord {
   final String message;
   final String recipient;
   final DateTime sentAt;
+  final bool archived;
 
   BroadcastRecord({
     required this.id,
@@ -588,6 +501,7 @@ class BroadcastRecord {
     required this.message,
     required this.recipient,
     required this.sentAt,
+    this.archived = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -596,6 +510,7 @@ class BroadcastRecord {
         'message': message,
         'recipient': recipient,
         'sentAt': sentAt.toIso8601String(),
+        'archived': archived,
       };
 
   factory BroadcastRecord.fromMap(Map<String, dynamic> map) => BroadcastRecord(
@@ -604,5 +519,6 @@ class BroadcastRecord {
         message: map['message'] ?? '',
         recipient: map['recipient'] ?? '',
         sentAt: DateTime.tryParse(map['sentAt'] ?? '') ?? DateTime.now(),
+        archived: map['archived'] ?? false,
       );
 }

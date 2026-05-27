@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../services/backend_service.dart';
+import '../../services/media_service.dart';
 import '../../widgets/common/widgets.dart';
 import 'tournament_detail_screen.dart';
 
@@ -26,16 +27,20 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
 
   List<TournamentModel> _getFiltered(
       List<TournamentModel> tournaments, TournamentStatus? status) {
-    var list = List<TournamentModel>.from(tournaments);
+    var list = tournaments.where((t) => !t.isArchived).toList();
     if (status != null) list = list.where((t) => t.status == status).toList();
     if (_gameFilter != null) {
       list = list.where((t) => t.game == _gameFilter).toList();
     }
     if (_search.text.isNotEmpty) {
-      list = list
-          .where(
-              (t) => t.title.toLowerCase().contains(_search.text.toLowerCase()))
-          .toList();
+      final query = _search.text.toLowerCase();
+      list = list.where((t) {
+        return t.title.toLowerCase().contains(query) ||
+            t.game.label.toLowerCase().contains(query) ||
+            (t.organizer ?? '').toLowerCase().contains(query) ||
+            (t.location ?? '').toLowerCase().contains(query) ||
+            t.type.toLowerCase().contains(query);
+      }).toList();
     }
     return list;
   }
@@ -197,16 +202,7 @@ class _TournamentList extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: AppDecorations.glowCard(glowColor: AppColors.bg0),
             child: Row(children: [
-              Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                      color: AppColors.bg3,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border)),
-                  child: Center(
-                      child: Text(t.game.emoji,
-                          style: const TextStyle(fontSize: 24)))),
+              _TournamentLogo(tournament: t),
               const SizedBox(width: 14),
               Expanded(
                   child: Column(
@@ -234,6 +230,37 @@ class _TournamentList extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _TournamentLogo extends StatelessWidget {
+  final TournamentModel tournament;
+
+  const _TournamentLogo({required this.tournament});
+
+  @override
+  Widget build(BuildContext context) {
+    final image = MediaService.imageProviderFor(tournament.logoUrl);
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: AppColors.bg3,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+        image: image == null
+            ? null
+            : DecorationImage(image: image, fit: BoxFit.cover),
+      ),
+      child: image == null
+          ? Center(
+              child: Text(
+                tournament.game.emoji,
+                style: const TextStyle(fontSize: 24),
+              ),
+            )
+          : null,
     );
   }
 }

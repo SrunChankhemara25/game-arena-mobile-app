@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../services/backend_service.dart';
+import '../../services/media_service.dart';
 
 class AC {
   static const bg0 = Color(0xFF0B0E1A);
@@ -383,340 +384,9 @@ class Tournament {
 }
 
 class DB {
-  static List<AppUser> users = [
-    AppUser(
-      id: 'u1',
-      name: 'Nova Admin',
-      email: 'admin@gamearena.gg',
-      role: 'Administrator',
-      country: 'Cambodia',
-    ),
-    AppUser(
-      id: 'u2',
-      name: 'Sok Dara',
-      email: 'dara@shadowwolves.gg',
-      role: 'Captain',
-      country: 'Cambodia',
-    ),
-    AppUser(
-      id: 'u3',
-      name: 'Lina Park',
-      email: 'lina@blacktide.gg',
-      role: 'Manager',
-      country: 'South Korea',
-    ),
-    AppUser(
-      id: 'u4',
-      name: 'Keo Piseth',
-      email: 'piseth@campusclutch.gg',
-      role: 'Player',
-      status: UserStatus.suspended,
-      country: 'Cambodia',
-    ),
-  ];
+  static List<AppUser> users = [];
 
-  static List<Tournament> tournaments = [
-    Tournament(
-      id: 'tour_1',
-      title: 'GameArena MLBB Pro Circuit',
-      game: GameCtx.mlbb,
-      logoUrl: defaultGameLogoUrl(GameCtx.mlbb),
-      status: TourStatus.live,
-      prize: '\$12,000',
-      type: '5v5',
-      format: TourFormat.groupAndElim,
-      startDate: '2026-06-01',
-      endDate: '2026-06-28',
-      regDeadline: '2026-05-28',
-      organizer: 'GameArena Cambodia',
-      location: 'Phnom Penh',
-      description:
-          'Top MLBB squads compete through group stage and playoffs for the mid-season title.',
-      requirements:
-          'Minimum 5 main players, 1 coach contact, and valid in-game accounts for all starters.',
-      maxTeams: 8,
-      registrants: [
-        TeamReg(
-          id: 'mlbb_1',
-          teamName: 'Shadow Wolves KH',
-          region: 'Cambodia',
-          roster: [
-            'ShadowX',
-            'BladeKH',
-            'StormZz',
-            'VoidEdge',
-            'RexNova',
-          ],
-          coach: 'IronFist',
-          assistantCoach: 'PulseNine',
-          manager: 'Mira',
-          note: 'Documents verified. Waiting for final admin decision.',
-          state: ApprovalState.pending,
-        ),
-        TeamReg(
-          id: 'mlbb_2',
-          teamName: 'Blacklist Rising',
-          region: 'Philippines',
-          roster: [
-            'OHEB',
-            'Wise',
-            'Edward',
-            'YveHeart',
-            'Nexus',
-          ],
-          coach: 'Bon Chan Jr',
-          assistantCoach: 'Melo',
-          manager: 'Paula',
-          note: 'Lineup confirmed for week one.',
-          state: ApprovalState.approved,
-        ),
-        TeamReg(
-          id: 'mlbb_3',
-          teamName: 'Crimson Echo',
-          region: 'Malaysia',
-          roster: [
-            'RazeMY',
-            'Apex',
-            'Tidal',
-            'Kairo',
-            'Rune',
-          ],
-          coach: 'Coach Ren',
-          assistantCoach: 'Aeron',
-          manager: 'Lumi',
-          note: 'Roster mismatch detected on player UID submission.',
-          state: ApprovalState.rejected,
-        ),
-      ],
-      schedules: [
-        ScheduleEntry(
-          id: 'sch_1',
-          round: 'Group Stage - Day 1',
-          teamA: 'Shadow Wolves KH',
-          teamB: 'Blacklist Rising',
-          date: '2026-06-01',
-          time: '15:00',
-          venue: 'GameArena Main Stage',
-        ),
-        ScheduleEntry(
-          id: 'sch_2',
-          round: 'Group Stage - Day 2',
-          teamA: 'Crimson Echo',
-          teamB: 'Shadow Wolves KH',
-          date: '2026-06-03',
-          time: '18:30',
-          venue: 'GameArena Main Stage',
-        ),
-      ],
-      bracketRounds: [
-        BracketRound(
-          id: 'br_1',
-          roundName: 'Semifinals',
-          matches: [
-            MatchNode(
-              id: 'm_1',
-              teamA: 'Shadow Wolves KH',
-              teamB: 'Blacklist Rising',
-              scoreA: 2,
-              scoreB: 1,
-              winner: 'Shadow Wolves KH',
-              date: '2026-06-21',
-              time: '17:00',
-              isFinalized: true,
-            ),
-            MatchNode(
-              id: 'm_2',
-              teamA: 'Crimson Echo',
-              teamB: 'TBD',
-              date: '2026-06-22',
-              time: '19:00',
-            ),
-          ],
-        ),
-        BracketRound(
-          id: 'br_2',
-          roundName: 'Grand Final',
-          matches: [
-            MatchNode(
-              id: 'm_3',
-              teamA: 'Shadow Wolves KH',
-              teamB: 'TBD',
-            ),
-          ],
-        ),
-      ],
-      standings: [
-        StandingEntry(
-          id: 'st_1',
-          teamName: 'Shadow Wolves KH',
-          played: 4,
-          wins: 3,
-          losses: 1,
-          gameWins: 11,
-          gameLosses: 5,
-          points: 9,
-        ),
-        StandingEntry(
-          id: 'st_2',
-          teamName: 'Blacklist Rising',
-          played: 4,
-          wins: 2,
-          losses: 2,
-          gameWins: 8,
-          gameLosses: 7,
-          points: 6,
-        ),
-        StandingEntry(
-          id: 'st_3',
-          teamName: 'Crimson Echo',
-          played: 4,
-          wins: 1,
-          losses: 3,
-          gameWins: 5,
-          gameLosses: 10,
-          points: 3,
-        ),
-      ],
-    ),
-    Tournament(
-      id: 'tour_2',
-      title: 'PUBG Mobile Campus Open',
-      game: GameCtx.pubg,
-      logoUrl: defaultGameLogoUrl(GameCtx.pubg),
-      status: TourStatus.open,
-      prize: '\$4,500',
-      type: 'Squad',
-      format: TourFormat.groupStage,
-      startDate: '2026-07-10',
-      endDate: '2026-07-20',
-      regDeadline: '2026-07-01',
-      organizer: 'Campus League',
-      location: 'Online',
-      description:
-          'Open campus circuit for university PUBG Mobile squads across Cambodia.',
-      requirements:
-          'Teams can submit up to 4 starters and 2 substitutes before check-in.',
-      maxTeams: 24,
-      registrants: [
-        TeamReg(
-          id: 'pubg_1',
-          teamName: 'Campus Clutch',
-          region: 'Phnom Penh',
-          roster: ['Pioneer', 'SnipeR', 'Vanta', 'Glider'],
-          coach: 'Coach K',
-          assistantCoach: 'Raf',
-          manager: 'Nika',
-          note: 'New roster uploaded after qualifier.',
-          state: ApprovalState.pending,
-        ),
-        TeamReg(
-          id: 'pubg_2',
-          teamName: 'Night Raiders',
-          region: 'Battambang',
-          roster: ['NightOwl', 'Phantom', 'DeltaRush', 'SkyLock'],
-          coach: 'Major B',
-          assistantCoach: null,
-          manager: 'Rin',
-          state: ApprovalState.pending,
-        ),
-      ],
-      schedules: [],
-      bracketRounds: [],
-      standings: [],
-    ),
-    Tournament(
-      id: 'tour_3',
-      title: 'Valorant City Invitational',
-      game: GameCtx.valorant,
-      logoUrl: defaultGameLogoUrl(GameCtx.valorant),
-      status: TourStatus.upcoming,
-      prize: '\$3,200',
-      type: '5v5',
-      format: TourFormat.doubleElim,
-      startDate: '2026-08-04',
-      endDate: '2026-08-11',
-      regDeadline: '2026-07-25',
-      organizer: 'City Arena',
-      location: 'Siem Reap',
-      description:
-          'An invitational built for disciplined rosters and mid-season testing.',
-      requirements:
-          'Each team must submit a coach or assistant coach point of contact.',
-      maxTeams: 8,
-      registrants: [
-        TeamReg(
-          id: 'val_1',
-          teamName: 'Blue Mirage',
-          region: 'Cambodia',
-          roster: ['Aster', 'Keen', 'Haze', 'Miko', 'Cero'],
-          coach: 'Jettson',
-          assistantCoach: 'Lix',
-          manager: 'Bora',
-          state: ApprovalState.approved,
-        ),
-        TeamReg(
-          id: 'val_2',
-          teamName: 'Neon District',
-          region: 'Thailand',
-          roster: ['Juno', 'Kilo', 'Reef', 'Sol', 'Mint'],
-          coach: 'Vanta',
-          assistantCoach: 'Cyan',
-          manager: 'Pim',
-          state: ApprovalState.pending,
-        ),
-      ],
-      schedules: [],
-      bracketRounds: [
-        BracketRound(
-          id: 'val_br_1',
-          roundName: 'Upper Round 1',
-          matches: [
-            MatchNode(
-              id: 'val_m_1',
-              teamA: 'Blue Mirage',
-              teamB: 'Neon District',
-              date: '2026-08-04',
-              time: '14:00',
-            ),
-          ],
-        ),
-      ],
-      standings: [],
-    ),
-    Tournament(
-      id: 'tour_4',
-      title: 'Free Fire Weekend Clash',
-      game: GameCtx.freeFire,
-      logoUrl: defaultGameLogoUrl(GameCtx.freeFire),
-      status: TourStatus.closed,
-      prize: '\$1,800',
-      type: 'Squad',
-      format: TourFormat.singleElim,
-      startDate: '2026-05-01',
-      endDate: '2026-05-03',
-      regDeadline: '2026-04-25',
-      organizer: 'FF Community Hub',
-      location: 'Online',
-      description: 'Weekend knockout event for fast-turnover community teams.',
-      maxTeams: 16,
-      isArchived: true,
-      registrants: [
-        TeamReg(
-          id: 'ff_1',
-          teamName: 'Fireline',
-          region: 'Cambodia',
-          roster: ['Flare', 'Zen', 'Bolt', 'Nova'],
-          coach: 'Ash',
-          assistantCoach: 'Grey',
-          manager: 'Uma',
-          state: ApprovalState.approved,
-        ),
-      ],
-      schedules: [],
-      bracketRounds: [],
-      standings: [],
-    ),
-  ];
+  static List<Tournament> tournaments = [];
 
   static bool _initialized = false;
 
@@ -808,6 +478,10 @@ class DB {
     await BackendService.instance.deleteBroadcastRecord(id);
   }
 
+  static Future<void> archiveBroadcastRecord(String id, bool archived) async {
+    await BackendService.instance.archiveBroadcastRecord(id, archived);
+  }
+
   /// Fetch all past broadcast records (newest first).
   static Future<List<BroadcastRecord>> getBroadcastHistory() async {
     return BackendService.instance.getBroadcastHistory();
@@ -872,6 +546,7 @@ class DB {
             teamB: _teamNameForId(model, match.team2Id),
             date: _datePart(match.scheduledAt),
             time: _timePart(match.scheduledAt),
+            venue: match.venue,
           ),
         )
         .toList();
@@ -955,17 +630,39 @@ class DB {
     };
     final teams = tournament.registrants.map((registration) {
       final existing = previousTeams[registration.id];
-      final players = existing?.players ??
-          registration.roster
-              .map(
-                (name) => PlayerModel(
-                  id: '${registration.id}_${name.hashCode}',
-                  ign: name,
-                  type: PlayerType.main,
-                  game: _gameTitleFromCtx(tournament.game),
-                ),
-              )
-              .toList();
+      final existingPlayers = {
+        for (final player in existing?.players ?? <PlayerModel>[])
+          player.ign.trim().toLowerCase(): player
+      };
+      final players = registration.roster.map((name) {
+        final key = name.trim().toLowerCase();
+        final previousPlayer = existingPlayers[key];
+        if (previousPlayer != null) {
+          return PlayerModel(
+            id: previousPlayer.id,
+            ign: name,
+            realName: previousPlayer.realName,
+            avatarUrl: previousPlayer.avatarUrl,
+            type: previousPlayer.type,
+            teamId: previousPlayer.teamId,
+            game: _gameTitleFromCtx(tournament.game),
+            contactInfo: previousPlayer.contactInfo,
+            fullName: previousPlayer.fullName,
+            role: previousPlayer.role,
+            nationality: previousPlayer.nationality,
+            jerseyNumber: previousPlayer.jerseyNumber,
+            gameUID: previousPlayer.gameUID,
+            idType: previousPlayer.idType,
+            dob: previousPlayer.dob,
+          );
+        }
+        return PlayerModel(
+          id: '${registration.id}_${name.hashCode}',
+          ign: name,
+          type: PlayerType.main,
+          game: _gameTitleFromCtx(tournament.game),
+        );
+      }).toList();
       return (existing ??
               TeamModel(
                 id: registration.id,
@@ -998,6 +695,7 @@ class DB {
           status: 'upcoming',
           scheduledAt:
               '${schedule.date}${schedule.time.isNotEmpty ? ' • ${schedule.time}' : ''}',
+          venue: schedule.venue,
         ),
       );
     }
@@ -1369,20 +1067,39 @@ class AdminLogoBadge extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(radius - 1),
-        child: imageUrl != null && imageUrl!.trim().isNotEmpty
-            ? Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _FallbackLogo(
-                  fallback: resolvedFallback,
-                  textStyle: textStyle,
-                ),
-              )
-            : _FallbackLogo(
-                fallback: resolvedFallback,
-                textStyle: textStyle,
-              ),
+        child: _AdminLogoImage(
+          imageUrl: imageUrl,
+          fallback: resolvedFallback,
+          textStyle: textStyle,
+        ),
       ),
+    );
+  }
+}
+
+class _AdminLogoImage extends StatelessWidget {
+  final String? imageUrl;
+  final String fallback;
+  final TextStyle? textStyle;
+
+  const _AdminLogoImage({
+    required this.imageUrl,
+    required this.fallback,
+    this.textStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = MediaService.imageProviderFor(imageUrl);
+    if (provider == null) {
+      return _FallbackLogo(fallback: fallback, textStyle: textStyle);
+    }
+
+    return Image(
+      image: provider,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) =>
+          _FallbackLogo(fallback: fallback, textStyle: textStyle),
     );
   }
 }

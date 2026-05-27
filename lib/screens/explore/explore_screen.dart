@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/models.dart';
+import '../../services/auth_service.dart';
 import '../../services/backend_service.dart';
+import '../../services/media_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common/widgets.dart';
 import '../profile/profile_screen.dart'; // ← adjust path to match your project structure
@@ -24,10 +26,18 @@ class ExploreScreenState extends State<ExploreScreen> {
   GameTitle? activeGameFilter;
   TournamentStatus? activeStatusFilter;
   bool _isSearchActive = false;
+  String? _userEmail;
 
   @override
   void initState() {
     super.initState();
+    _loadSession();
+  }
+
+  Future<void> _loadSession() async {
+    final email = await AuthService().getLoggedInUserEmail();
+    if (!mounted) return;
+    setState(() => _userEmail = email);
   }
 
   @override
@@ -38,7 +48,7 @@ class ExploreScreenState extends State<ExploreScreen> {
   }
 
   List<TournamentModel> _filteredTournaments(List<TournamentModel> source) {
-    var list = List<TournamentModel>.from(source);
+    var list = source.where((t) => !t.isArchived).toList();
 
     if (activeGameFilter != null) {
       list = list.where((t) => t.game == activeGameFilter).toList();
@@ -53,7 +63,13 @@ class ExploreScreenState extends State<ExploreScreen> {
         final titleMatch = t.title.toLowerCase().contains(query);
         final orgMatch = (t.organizer ?? '').toLowerCase().contains(query);
         final gameMatch = t.game.label.toLowerCase().contains(query);
-        return titleMatch || orgMatch || gameMatch;
+        final locationMatch = (t.location ?? '').toLowerCase().contains(query);
+        final typeMatch = t.type.toLowerCase().contains(query);
+        return titleMatch ||
+            orgMatch ||
+            gameMatch ||
+            locationMatch ||
+            typeMatch;
       }).toList();
     }
 
@@ -161,6 +177,137 @@ class ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildDefaultProfileHeader() {
+    final email = _userEmail;
+    if (email == null) {
+      return _buildProfileHeaderContent(
+        name: 'Player',
+        avatarUrl: null,
+        unreadCount: 0,
+        onProfileTap: () {
+          HapticFeedback.lightImpact();
+          _navigateToProfile(scrollToAlerts: false);
+        },
+        onAlertsTap: () {
+          HapticFeedback.lightImpact();
+          _navigateToProfile(scrollToAlerts: true);
+        },
+        onSearchTap: () {
+          HapticFeedback.lightImpact();
+          setState(() => _isSearchActive = true);
+        },
+      );
+    }
+
+    return StreamBuilder<UserModel?>(
+      stream: BackendService.instance.watchUserProfile(email),
+      builder: (context, profileSnapshot) {
+        return StreamBuilder<int>(
+          stream: BackendService.instance.watchUnreadNotificationCount(email),
+          builder: (context, unreadSnapshot) {
+            final profile = profileSnapshot.data;
+            return _buildProfileHeaderContent(
+              name: profile?.name ?? 'Player',
+              avatarUrl: profile?.avatarUrl,
+              unreadCount: unreadSnapshot.data ?? 0,
+              onProfileTap: () {
+                HapticFeedback.lightImpact();
+                _navigateToProfile(scrollToAlerts: false);
+              },
+              onAlertsTap: () {
+                HapticFeedback.lightImpact();
+                _navigateToProfile(scrollToAlerts: true);
+              },
+              onSearchTap: () {
+                HapticFeedback.lightImpact();
+                setState(() => _isSearchActive = true);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileAvatar(String name, String? avatarUrl) {
+    final image = MediaService.imageProviderFor(avatarUrl);
+    final initials = name.trim().isEmpty
+        ? 'P'
+        : name
+            .trim()
+            .split(RegExp(r'\s+'))
+            .take(2)
+            .map((part) => part[0].toUpperCase())
+            .join();
+
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: AppColors.bg1,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.magenta, width: 1.5),
+        image: image == null
+            ? null
+            : DecorationImage(image: image, fit: BoxFit.cover),
+      ),
+      alignment: Alignment.center,
+      child: image == null
+          ? Text(
+              initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.0,
+              ),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildNotificationButton({
+    required int unreadCount,
+    required VoidCallback onTap,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _buildHeaderIconButton(Icons.notifications_none_rounded, onTap),
+        if (unreadCount > 0)
+          Positioned(
+            right: -4,
+            top: -5,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.red,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.bg0, width: 1.5),
+              ),
+              child: Text(
+                unreadCount > 99 ? '99+' : '$unreadCount',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildProfileHeaderContent({
+    required String name,
+    required String? avatarUrl,
+    required int unreadCount,
+    required VoidCallback onProfileTap,
+    required VoidCallback onAlertsTap,
+    required VoidCallback onSearchTap,
+  }) {
     return Padding(
       key: const ValueKey('DefaultProfileHeader'),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
@@ -168,43 +315,19 @@ class ExploreScreenState extends State<ExploreScreen> {
         children: [
           // ── Tappable avatar → ProfileScreen ──────────────────────────
           GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              _navigateToProfile(scrollToAlerts: false);
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.bg1,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.magenta, width: 1.5),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'VS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.0,
-                ),
-              ),
-            ),
+            onTap: onProfileTap,
+            child: _buildProfileAvatar(name, avatarUrl),
           ),
           const SizedBox(width: 12),
 
           // ── Tappable name/tier row → ProfileScreen ───────────────────
           Expanded(
             child: GestureDetector(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                _navigateToProfile(scrollToAlerts: false);
-              },
+              onTap: onProfileTap,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Vortex_Striker',
+                  Text(name,
                       style: AppText.heading
                           .copyWith(fontSize: 16, letterSpacing: 0.3)),
                   const SizedBox(height: 2),
@@ -230,17 +353,14 @@ class ExploreScreenState extends State<ExploreScreen> {
           ),
 
           // ── Bell icon → ProfileScreen scrolled to Alerts ─────────────
-          _buildHeaderIconButton(Icons.notifications_none_rounded, () {
-            HapticFeedback.lightImpact();
-            _navigateToProfile(scrollToAlerts: true);
-          }),
+          _buildNotificationButton(
+            unreadCount: unreadCount,
+            onTap: onAlertsTap,
+          ),
           const SizedBox(width: 10),
 
           // ── Search icon → inline search bar ──────────────────────────
-          _buildHeaderIconButton(Icons.search_rounded, () {
-            HapticFeedback.lightImpact();
-            setState(() => _isSearchActive = true);
-          }),
+          _buildHeaderIconButton(Icons.search_rounded, onSearchTap),
         ],
       ),
     );
@@ -450,18 +570,7 @@ class ExploreScreenState extends State<ExploreScreen> {
                         AppDecorations.glowCard(glowColor: AppColors.bg0),
                     child: Row(
                       children: [
-                        // Game emoji icon box
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                              color: AppColors.bg3,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border)),
-                          child: Center(
-                              child: Text(t.game.emoji,
-                                  style: const TextStyle(fontSize: 24))),
-                        ),
+                        _buildTournamentLogo(t),
                         const SizedBox(width: 14),
                         // Title, badges, date/prize
                         Expanded(
@@ -541,6 +650,30 @@ class ExploreScreenState extends State<ExploreScreen> {
           ),
         )
       ],
+    );
+  }
+
+  Widget _buildTournamentLogo(TournamentModel tournament) {
+    final image = MediaService.imageProviderFor(tournament.logoUrl);
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: AppColors.bg3,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+        image: image == null
+            ? null
+            : DecorationImage(image: image, fit: BoxFit.cover),
+      ),
+      child: image == null
+          ? Center(
+              child: Text(
+                tournament.game.emoji,
+                style: const TextStyle(fontSize: 24),
+              ),
+            )
+          : null,
     );
   }
 }

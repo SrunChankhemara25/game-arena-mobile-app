@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../models/models.dart';
+import '../../services/media_service.dart';
 
 // ─── Premium Tactile Glow Button ─────────────────────────────────────────────
 class GlowButton extends StatefulWidget {
@@ -314,27 +315,34 @@ class TeamAvatar extends StatelessWidget {
   const TeamAvatar({super.key, required this.team, this.size = 48.0});
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: AppColors.bg3,
-          borderRadius: BorderRadius.circular(size * 0.28),
-          border:
-              Border.all(color: AppColors.cyan.withOpacity(0.2), width: 1.2),
-        ),
-        child: Center(
-          child: Text(
-            team.name.length >= 2
-                ? team.name.substring(0, 2).toUpperCase()
-                : team.name.toUpperCase(),
-            style: AppText.displaySm.copyWith(
-                fontSize: size * 0.32,
-                color: AppColors.cyan,
-                fontWeight: FontWeight.w700),
-          ),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final image = MediaService.imageProviderFor(team.logoUrl);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.bg3,
+        borderRadius: BorderRadius.circular(size * 0.28),
+        border: Border.all(color: AppColors.cyan.withOpacity(0.2), width: 1.2),
+        image: image == null
+            ? null
+            : DecorationImage(image: image, fit: BoxFit.cover),
+      ),
+      child: image == null
+          ? Center(
+              child: Text(
+                team.name.length >= 2
+                    ? team.name.substring(0, 2).toUpperCase()
+                    : team.name.toUpperCase(),
+                style: AppText.displaySm.copyWith(
+                    fontSize: size * 0.32,
+                    color: AppColors.cyan,
+                    fontWeight: FontWeight.w700),
+              ),
+            )
+          : null,
+    );
+  }
 }
 
 // ─── Halo-Ring Player Profile Ring ───────────────────────────────────────────
@@ -346,6 +354,7 @@ class PlayerAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ringColor = _typeColor(player.type);
+    final image = MediaService.imageProviderFor(player.avatarUrl);
     return Container(
       width: size,
       height: size,
@@ -353,6 +362,9 @@ class PlayerAvatar extends StatelessWidget {
         color: AppColors.bg3,
         shape: BoxShape.circle,
         border: Border.all(color: ringColor, width: 2.0),
+        image: image == null
+            ? null
+            : DecorationImage(image: image, fit: BoxFit.cover),
         boxShadow: [
           BoxShadow(
             color: ringColor.withOpacity(0.15),
@@ -360,17 +372,19 @@ class PlayerAvatar extends StatelessWidget {
           )
         ],
       ),
-      child: Center(
-        child: Text(
-          player.ign.isNotEmpty
-              ? player.ign.substring(0, 1).toUpperCase()
-              : 'P',
-          style: AppText.heading.copyWith(
-              fontSize: size * 0.38,
-              color: ringColor,
-              fontWeight: FontWeight.w700),
-        ),
-      ),
+      child: image == null
+          ? Center(
+              child: Text(
+                player.ign.isNotEmpty
+                    ? player.ign.substring(0, 1).toUpperCase()
+                    : 'P',
+                style: AppText.heading.copyWith(
+                    fontSize: size * 0.38,
+                    color: ringColor,
+                    fontWeight: FontWeight.w700),
+              ),
+            )
+          : null,
     );
   }
 

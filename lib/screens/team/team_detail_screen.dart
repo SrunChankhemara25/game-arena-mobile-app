@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../models/models.dart';
+import '../../services/media_service.dart';
 import '../../widgets/common/widgets.dart';
 import 'player_detail_screen.dart';
 
@@ -199,6 +200,7 @@ class _TeamHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final logoImage = MediaService.imageProviderFor(team.logoUrl);
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -246,27 +248,38 @@ class _TeamHero extends StatelessWidget {
                           border: Border.all(
                               color: AppColors.cyan.withOpacity(0.4),
                               width: 1.5),
+                          image: logoImage == null
+                              ? null
+                              : DecorationImage(
+                                  image: logoImage,
+                                  fit: BoxFit.cover,
+                                ),
                           boxShadow: [
                             BoxShadow(
                                 color: AppColors.cyan.withOpacity(0.12),
                                 blurRadius: 20)
                           ],
                         ),
-                        child: Center(
-                          child: ShaderMask(
-                            shaderCallback: (bounds) =>
-                                AppColors.gradientCyan.createShader(bounds),
-                            child: Text(
-                              team.name.length >= 2
-                                  ? team.name.substring(0, 2).toUpperCase()
-                                  : team.name.toUpperCase(),
-                              style: AppText.displaySm.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                        ),
+                        child: logoImage == null
+                            ? Center(
+                                child: ShaderMask(
+                                  shaderCallback: (bounds) => AppColors
+                                      .gradientCyan
+                                      .createShader(bounds),
+                                  child: Text(
+                                    team.name.length >= 2
+                                        ? team.name
+                                            .substring(0, 2)
+                                            .toUpperCase()
+                                        : team.name.toUpperCase(),
+                                    style: AppText.displaySm.copyWith(
+                                        color: Colors.white,
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w900),
+                                  ),
+                                ),
+                              )
+                            : null,
                       ),
                       const SizedBox(width: 18),
                       Expanded(

@@ -92,101 +92,120 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final t = widget.tournament;
-    return Scaffold(
-      backgroundColor: AppColors.bg0,
-      body: NestedScrollView(
-        headerSliverBuilder: (_, __) => [
-          SliverAppBar(
-            expandedHeight: 240,
-            pinned: true,
+    return StreamBuilder<TournamentModel?>(
+      stream: BackendService.instance.watchTournament(widget.tournament.id),
+      builder: (context, snapshot) {
+        final t = snapshot.data ?? widget.tournament;
+        if (t.isArchived) {
+          return const Scaffold(
             backgroundColor: AppColors.bg0,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.bg2,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: const Icon(AppIcons.back,
-                      size: 16, color: AppColors.textSecondary),
-                ),
-              ),
+            body: EmptyState(
+              icon: Icons.archive_outlined,
+              title: 'Tournament unavailable',
+              subtitle: 'This tournament is no longer visible to players.',
             ),
-            actions: [
-              GestureDetector(
-                onTap: () => HapticFeedback.lightImpact(),
-                child: Container(
-                  margin: const EdgeInsets.all(8),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.bg2,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.border),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.bg0,
+          body: NestedScrollView(
+            headerSliverBuilder: (_, __) => [
+              SliverAppBar(
+                expandedHeight: 240,
+                pinned: true,
+                backgroundColor: AppColors.bg0,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                leading: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      margin: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.bg2,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Icon(AppIcons.back,
+                          size: 16, color: AppColors.textSecondary),
+                    ),
                   ),
-                  child: const Icon(AppIcons.share,
-                      size: 18, color: AppColors.textSecondary),
+                ),
+                actions: [
+                  GestureDetector(
+                    onTap: () => HapticFeedback.lightImpact(),
+                    child: Container(
+                      margin: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.bg2,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Icon(AppIcons.share,
+                          size: 18, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  collapseMode: CollapseMode.parallax,
+                  background: FadeTransition(
+                    opacity: _heroFade,
+                    child: SlideTransition(
+                      position: _heroSlide,
+                      child: _TournamentHero(tournament: t),
+                    ),
+                  ),
+                ),
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(48),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: AppColors.bg0,
+                      border: Border(
+                          bottom:
+                              BorderSide(color: AppColors.border, width: 0.5)),
+                    ),
+                    child: TabBar(
+                      controller: _tab,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      indicatorColor: AppColors.cyan,
+                      indicatorWeight: 2,
+                      indicatorSize: TabBarIndicatorSize.label,
+                      dividerColor: Colors.transparent,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 18),
+                      labelStyle: AppText.btnSm.copyWith(
+                          color: AppColors.cyan,
+                          fontSize: 11,
+                          letterSpacing: 1.5),
+                      unselectedLabelStyle: AppText.btnSm.copyWith(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                          letterSpacing: 1.5),
+                      tabs: _tabs.map((l) => Tab(text: l)).toList(),
+                    ),
+                  ),
                 ),
               ),
             ],
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.parallax,
-              background: FadeTransition(
-                opacity: _heroFade,
-                child: SlideTransition(
-                  position: _heroSlide,
-                  child: _TournamentHero(tournament: t),
-                ),
-              ),
-            ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(48),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: AppColors.bg0,
-                  border: Border(
-                      bottom: BorderSide(color: AppColors.border, width: 0.5)),
-                ),
-                child: TabBar(
-                  controller: _tab,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  indicatorColor: AppColors.cyan,
-                  indicatorWeight: 2,
-                  indicatorSize: TabBarIndicatorSize.label,
-                  dividerColor: Colors.transparent,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 18),
-                  labelStyle: AppText.btnSm.copyWith(
-                      color: AppColors.cyan, fontSize: 11, letterSpacing: 1.5),
-                  unselectedLabelStyle: AppText.btnSm.copyWith(
-                      color: AppColors.textMuted,
-                      fontSize: 11,
-                      letterSpacing: 1.5),
-                  tabs: _tabs.map((l) => Tab(text: l)).toList(),
-                ),
-              ),
+            body: TabBarView(
+              controller: _tab,
+              children: [
+                _OverviewTab(tournament: t),
+                _TeamsTab(tournament: t),
+                _ScheduleTab(tournament: t),
+                _BracketTab(tournament: t),
+                _StandingsTab(tournament: t),
+              ],
             ),
           ),
-        ],
-        body: TabBarView(
-          controller: _tab,
-          children: [
-            _OverviewTab(tournament: t),
-            _TeamsTab(tournament: t),
-            _ScheduleTab(tournament: t),
-            _BracketTab(tournament: t),
-            _StandingsTab(tournament: t),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -858,6 +877,19 @@ class _ScheduleMatchCard extends StatelessWidget {
             const Icon(AppIcons.clock, size: 11, color: AppColors.textMuted),
             const SizedBox(width: 5),
             Text(match.scheduledAt ?? 'TBA', style: AppText.caption),
+            if (match.venue?.trim().isNotEmpty == true) ...[
+              const SizedBox(width: 10),
+              const Icon(AppIcons.location,
+                  size: 11, color: AppColors.textMuted),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  match.venue!,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption,
+                ),
+              ),
+            ],
             const Spacer(),
             _MatchStatusChip(status: match.status),
           ]),
@@ -1875,6 +1907,28 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
     final ownerProfile = ownerEmail == null
         ? null
         : await BackendService.instance.getUserProfile(ownerEmail);
+    if (!mounted) return;
+
+    final normalizedOwner = ownerEmail?.trim().toLowerCase();
+    final alreadyRegistered = widget.tournament.teams.any((team) {
+      final sameOwner = normalizedOwner != null &&
+          normalizedOwner.isNotEmpty &&
+          team.ownerEmail?.trim().toLowerCase() == normalizedOwner;
+      final sameTeam = existingTeam != null && team.id == existingTeam.id;
+      return sameOwner || sameTeam;
+    });
+
+    if (alreadyRegistered ||
+        existingTeam?.registeredTournamentIds.contains(widget.tournament.id) ==
+            true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('This account is already registered for this tournament.'),
+        ),
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
     HapticFeedback.mediumImpact();
@@ -1931,12 +1985,19 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
         _submitting = false;
         _submitted = true;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() => _submitting = false);
+      final message = error
+          .toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('Exception', '')
+          .trim();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to submit roster right now. Please try again.'),
+        SnackBar(
+          content: Text(message.isEmpty
+              ? 'Unable to submit roster right now. Please try again.'
+              : message),
         ),
       );
     }
@@ -1946,7 +2007,8 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Image picker not connected in demo'),
+        content:
+            const Text('Uploads are saved from your profile or team editor.'),
         backgroundColor: AppColors.bg2,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
