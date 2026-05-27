@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common/widgets.dart';
 
@@ -12,7 +13,8 @@ class ChangePasswordScreen extends StatefulWidget {
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
 }
 
-class _ChangePasswordScreenState extends State<ChangePasswordScreen> with SingleTickerProviderStateMixin {
+class _ChangePasswordScreenState extends State<ChangePasswordScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _currentController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -38,12 +40,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0.0, 0.04),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+    ).animate(CurvedAnimation(
+        parent: _animationController, curve: Curves.easeOutCubic));
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
+    ).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
 
     _animationController.forward();
   }
@@ -69,29 +73,42 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
     setState(() => _loading = true);
 
     try {
-      // Simulating enterprise security update transmission latency
-      await Future.delayed(const Duration(milliseconds: 1200));
+      final email = await AuthService().getLoggedInUserEmail();
+      if (email == null || email.isEmpty) {
+        throw Exception('No active session found.');
+      }
+      await AuthService().changePassword(
+        email: email,
+        currentPassword: _currentController.text.trim(),
+        newPassword: _newPasswordController.text.trim(),
+      );
       if (!mounted) return;
       setState(() => _loading = false);
 
       HapticFeedback.selectionClick();
-      
+
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
           backgroundColor: AppColors.bg1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppColors.border)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: AppColors.border)),
           title: Row(
             children: [
-              const Icon(Icons.check_circle_outline_rounded, color: AppColors.green, size: 24),
+              const Icon(Icons.check_circle_outline_rounded,
+                  color: AppColors.green, size: 24),
               const SizedBox(width: 10),
-              Text('Password Updated', style: AppText.heading.copyWith(color: AppColors.textPrimary)),
+              Text('Password Updated',
+                  style:
+                      AppText.heading.copyWith(color: AppColors.textPrimary)),
             ],
           ),
           content: Text(
             'Your authentication credentials have been updated successfully across the network infrastructure.',
-            style: AppText.body.copyWith(color: AppColors.textSecondary, height: 1.5),
+            style: AppText.body
+                .copyWith(color: AppColors.textSecondary, height: 1.5),
           ),
           actions: [
             TextButton(
@@ -102,7 +119,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
               },
               child: Text(
                 'OK',
-                style: AppText.body.copyWith(color: AppColors.cyan, fontWeight: FontWeight.bold),
+                style: AppText.body.copyWith(
+                    color: AppColors.cyan, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -125,13 +143,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
         backgroundColor: AppColors.bg0,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              size: 18, color: AppColors.textPrimary),
           onPressed: () {
             HapticFeedback.lightImpact();
             Navigator.pop(context);
           },
         ),
-        title: Text('CHANGE PASSWORD', style: AppText.heading.copyWith(letterSpacing: 1.2, fontSize: 16)),
+        title: Text('CHANGE PASSWORD',
+            style: AppText.heading.copyWith(letterSpacing: 1.2, fontSize: 16)),
         centerTitle: false,
       ),
       body: Stack(
@@ -170,7 +190,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                 position: _slideAnimation,
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -178,9 +199,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                       children: [
                         Text(
                           'Update your account password to keep your profile secure.',
-                          style: AppText.body.copyWith(color: AppColors.textSecondary, height: 1.5),
+                          style: AppText.body.copyWith(
+                              color: AppColors.textSecondary, height: 1.5),
                         ),
-                        
+
                         const SizedBox(height: 32),
 
                         // Form Glass Card Surface Container
@@ -193,7 +215,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                             children: [
                               Text(
                                 'AUTHENTICATION PARAMS',
-                                style: AppText.label.copyWith(color: AppColors.textMuted, fontWeight: FontWeight.bold),
+                                style: AppText.label.copyWith(
+                                    color: AppColors.textMuted,
+                                    fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 24),
 
@@ -204,7 +228,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                                 controller: _currentController,
                                 obscureText: _isCurrentObscured,
                                 textInputAction: TextInputAction.next,
-                                style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
+                                style: AppText.bodyMd
+                                    .copyWith(color: AppColors.textPrimary),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'Please enter your current password';
@@ -213,14 +238,21 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                                 },
                                 decoration: InputDecoration(
                                   hintText: 'Enter old verification token',
-                                  prefixIcon: const Icon(Icons.lock_open_rounded, color: AppColors.textMuted, size: 20),
+                                  prefixIcon: const Icon(
+                                      Icons.lock_open_rounded,
+                                      color: AppColors.textMuted,
+                                      size: 20),
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      _isCurrentObscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                      _isCurrentObscured
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
                                       color: AppColors.textMuted,
                                       size: 20,
                                     ),
-                                    onPressed: () => setState(() => _isCurrentObscured = !_isCurrentObscured),
+                                    onPressed: () => setState(() =>
+                                        _isCurrentObscured =
+                                            !_isCurrentObscured),
                                   ),
                                 ),
                               ),
@@ -233,7 +265,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                                 controller: _newPasswordController,
                                 obscureText: _isNewObscured,
                                 textInputAction: TextInputAction.next,
-                                style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
+                                style: AppText.bodyMd
+                                    .copyWith(color: AppColors.textPrimary),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'Please enter a new password';
@@ -248,14 +281,20 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                                 },
                                 decoration: InputDecoration(
                                   hintText: 'Minimum 8 characters',
-                                  prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.textMuted, size: 20),
+                                  prefixIcon: const Icon(
+                                      Icons.lock_outline_rounded,
+                                      color: AppColors.textMuted,
+                                      size: 20),
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      _isNewObscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                      _isNewObscured
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
                                       color: AppColors.textMuted,
                                       size: 20,
                                     ),
-                                    onPressed: () => setState(() => _isNewObscured = !_isNewObscured),
+                                    onPressed: () => setState(
+                                        () => _isNewObscured = !_isNewObscured),
                                   ),
                                 ),
                               ),
@@ -269,7 +308,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                                 obscureText: _isConfirmObscured,
                                 textInputAction: TextInputAction.done,
                                 onFieldSubmitted: (_) => _savePassword(),
-                                style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
+                                style: AppText.bodyMd
+                                    .copyWith(color: AppColors.textPrimary),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'Please confirm your new password';
@@ -280,15 +320,23 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                                   return null;
                                 },
                                 decoration: InputDecoration(
-                                  hintText: 'Repeat new password structural pattern',
-                                  prefixIcon: const Icon(Icons.gpp_good_outlined, color: AppColors.textMuted, size: 20),
+                                  hintText:
+                                      'Repeat new password structural pattern',
+                                  prefixIcon: const Icon(
+                                      Icons.gpp_good_outlined,
+                                      color: AppColors.textMuted,
+                                      size: 20),
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      _isConfirmObscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                      _isConfirmObscured
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
                                       color: AppColors.textMuted,
                                       size: 20,
                                     ),
-                                    onPressed: () => setState(() => _isConfirmObscured = !_isConfirmObscured),
+                                    onPressed: () => setState(() =>
+                                        _isConfirmObscured =
+                                            !_isConfirmObscured),
                                   ),
                                 ),
                               ),
@@ -303,14 +351,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
                                         height: 56,
                                         decoration: BoxDecoration(
                                           color: AppColors.bg2,
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: AppColors.border),
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          border: Border.all(
+                                              color: AppColors.border),
                                         ),
                                         child: const Center(
                                           child: SizedBox(
                                             width: 22,
                                             height: 22,
-                                            child: CircularProgressIndicator(color: AppColors.cyan, strokeWidth: 2.5),
+                                            child: CircularProgressIndicator(
+                                                color: AppColors.cyan,
+                                                strokeWidth: 2.5),
                                           ),
                                         ),
                                       )
@@ -340,7 +392,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> with Single
   Widget _buildFieldLabel(String label) {
     return Text(
       label,
-      style: AppText.label.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+      style: AppText.label.copyWith(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5),
     );
   }
 }

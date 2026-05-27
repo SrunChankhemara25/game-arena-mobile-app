@@ -28,6 +28,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _NavItem(Icons.campaign_rounded, 'Broadcast'),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    DB.initialize().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   Future<void> _signOut() async {
     final confirm = await showConfirmDialog(
       context,

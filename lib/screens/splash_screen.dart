@@ -2,8 +2,12 @@ import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../models/models.dart';
+import '../services/auth_service.dart';
+import '../services/backend_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/widgets.dart';
+import 'admin/admin_dashboard.dart';
 import 'main_nav.dart';
 import 'auth/login_screen.dart';
 
@@ -38,6 +42,23 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (mounted) {
       HapticFeedback.mediumImpact();
+      final savedEmail = await AuthService().getLoggedInUserEmail();
+      if (savedEmail != null) {
+        final user = await BackendService.instance.getUserProfile(savedEmail);
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => user?.role == UserRole.admin
+                ? const AdminDashboard()
+                : MainNav(isAdmin: user?.role == UserRole.admin),
+            transitionsBuilder: (_, anim, __, child) =>
+                FadeTransition(opacity: anim, child: child),
+            transitionDuration: const Duration(milliseconds: 800),
+          ),
+        );
+        return;
+      }
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(

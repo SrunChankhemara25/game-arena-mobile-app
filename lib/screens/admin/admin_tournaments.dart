@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -18,6 +16,14 @@ class _AdminTournamentsViewState extends State<AdminTournamentsView>
   bool _showArchived = false;
   final _searchCtrl = TextEditingController();
   Key _listKey = UniqueKey();
+
+  @override
+  void initState() {
+    super.initState();
+    DB.initialize().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
@@ -117,8 +123,7 @@ class _AdminTournamentsViewState extends State<AdminTournamentsView>
                       tournaments: tournaments,
                       onOpen: _openTournament,
                       onEdit: (t) => _openEditor(existing: t),
-                      onArchiveToggle: (t) =>
-                          setState(() => t.isArchived = !t.isArchived),
+                      onArchiveToggle: _toggleArchive,
                       onDelete: _deleteTournament,
                     ),
             ),
@@ -170,6 +175,15 @@ class _AdminTournamentsViewState extends State<AdminTournamentsView>
     if (mounted) setState(() {});
   }
 
+  Future<void> _toggleArchive(Tournament tournament) async {
+    await DB.setTournamentArchived(tournament.id, !tournament.isArchived);
+    if (mounted) {
+      setState(() {
+        _listKey = UniqueKey();
+      });
+    }
+  }
+
   Future<void> _deleteTournament(Tournament tournament) async {
     final confirm = await showConfirmDialog(
       context,
@@ -181,7 +195,8 @@ class _AdminTournamentsViewState extends State<AdminTournamentsView>
       icon: Icons.delete_outline_rounded,
     );
     if (!confirm) return;
-    setState(() => DB.tournaments.remove(tournament));
+    await DB.deleteTournament(tournament.id);
+    if (mounted) setState(() {});
   }
 }
 
@@ -1021,7 +1036,7 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
     );
   }
 
-  void _saveTournament() {
+  void _saveTournament() async {
     final resolvedGame = _resolveGameFromText(_gameCtrl.text.trim()) ?? _game;
     final maxTeams = int.tryParse(_maxTeamsCtrl.text.trim()) ?? 16;
     final existing = widget.existing;
@@ -1044,8 +1059,9 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
       existing.location = _locationCtrl.text.trim();
       existing.description = _descriptionCtrl.text.trim();
       existing.requirements = _requirementsCtrl.text.trim();
+      await DB.saveTournament(existing);
     } else {
-      DB.tournaments.add(
+      await DB.saveTournament(
         Tournament(
           id: 'tour_${DateTime.now().millisecondsSinceEpoch}',
           title: _titleCtrl.text.trim(),
@@ -1073,6 +1089,7 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
       );
     }
 
+    if (!mounted) return;
     Navigator.pop(context, true);
   }
 
@@ -1231,6 +1248,7 @@ class _AdminTournamentDetailScreenState
 
   @override
   void dispose() {
+    DB.saveTournament(widget.tournament);
     _tabCtrl.dispose();
     super.dispose();
   }

@@ -2,9 +2,10 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend_service.dart';
 import '../../theme/app_theme.dart';
 import '../../models/models.dart';
-import '../../data/mock_data.dart';
 import '../../widgets/common/widgets.dart';
 import 'team_detail_screen.dart';
 
@@ -19,6 +20,8 @@ class MyTeamScreen extends StatefulWidget {
 class _MyTeamScreenState extends State<MyTeamScreen>
     with SingleTickerProviderStateMixin {
   TeamModel? _myTeam;
+  String? _userEmail;
+  bool _loading = true;
   late final AnimationController _entranceController;
   late final Animation<double> _fadeAnimation;
 
@@ -32,6 +35,7 @@ class _MyTeamScreenState extends State<MyTeamScreen>
     _fadeAnimation =
         CurvedAnimation(parent: _entranceController, curve: Curves.easeOut);
     _entranceController.forward();
+    _loadMyTeam();
   }
 
   @override
@@ -44,10 +48,15 @@ class _MyTeamScreenState extends State<MyTeamScreen>
     HapticFeedback.mediumImpact();
     final result = await Navigator.push<TeamModel>(
       context,
-      MaterialPageRoute(builder: (_) => const CreateTeamScreen()),
+      MaterialPageRoute(
+        builder: (_) => CreateTeamScreen(
+          ownerEmail: _userEmail,
+          initialContactEmail: _userEmail,
+        ),
+      ),
     );
     if (result != null) {
-      setState(() => _myTeam = result);
+      await _persistTeam(result);
       _entranceController.forward(from: 0.0);
     }
   }
@@ -78,9 +87,21 @@ class _MyTeamScreenState extends State<MyTeamScreen>
                 style: AppText.label.copyWith(color: AppColors.textMuted)),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
+              final currentTeam = _myTeam;
               setState(() => _myTeam = null);
+              if (currentTeam != null) {
+                await BackendService.instance.deleteTeam(currentTeam.id);
+              }
+              if (_userEmail != null) {
+                final user =
+                    await BackendService.instance.getUserProfile(_userEmail!);
+                if (user != null) {
+                  await BackendService.instance
+                      .saveUserProfile(user.copyWith(teamId: null));
+                }
+              }
               _entranceController.forward(from: 0.0);
             },
             child: Text('DISBAND',
@@ -128,8 +149,35 @@ class _MyTeamScreenState extends State<MyTeamScreen>
       ),
     );
     if (result != null && result.isNotEmpty && _myTeam != null) {
-      setState(() => _myTeam = _myTeam!.copyWith(name: result));
+      await _persistTeam(_myTeam!.copyWith(name: result));
     }
+  }
+
+  Future<void> _loadMyTeam() async {
+    final email = await AuthService().getLoggedInUserEmail();
+    TeamModel? team;
+    if (email != null) {
+      team = await BackendService.instance.getTeamByOwner(email);
+    }
+    if (!mounted) return;
+    setState(() {
+      _userEmail = email;
+      _myTeam = team;
+      _loading = false;
+    });
+  }
+
+  Future<void> _persistTeam(TeamModel updated) async {
+    await BackendService.instance.saveTeam(updated);
+    if (_userEmail != null) {
+      final user = await BackendService.instance.getUserProfile(_userEmail!);
+      if (user != null) {
+        await BackendService.instance
+            .saveUserProfile(user.copyWith(teamId: updated.id));
+      }
+    }
+    if (!mounted) return;
+    setState(() => _myTeam = updated);
   }
 
   void _showTeamMenu() {
@@ -232,13 +280,16 @@ class _MyTeamScreenState extends State<MyTeamScreen>
           ),
           FadeTransition(
             opacity: _fadeAnimation,
-            child: _myTeam == null
-                ? _NoTeamView(onCreate: _createTeam)
-                : _HasTeamView(
-                    team: _myTeam!,
-                    onTeamUpdated: (updated) =>
-                        setState(() => _myTeam = updated),
-                  ),
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.cyan),
+                  )
+                : _myTeam == null
+                    ? _NoTeamView(onCreate: _createTeam)
+                    : _HasTeamView(
+                        team: _myTeam!,
+                        onTeamUpdated: (updated) => _persistTeam(updated),
+                      ),
           ),
         ],
       ),
@@ -542,7 +593,10 @@ class _HasTeamView extends StatelessWidget {
               HapticFeedback.lightImpact();
               final updated = await Navigator.push<TeamModel>(
                 context,
-                MaterialPageRoute(builder: (_) => TeamDetailScreen(team: team)),
+                MaterialPageRoute(
+                  builder: (_) =>
+                      TeamDetailScreen(team: team, isViewOnly: false),
+                ),
               );
               if (updated != null) {
                 onTeamUpdated(updated);
@@ -604,7 +658,14 @@ class _HasTeamView extends StatelessWidget {
 
 // ─── Create Team Wizard ───────────────────────────────────────────────────────
 class CreateTeamScreen extends StatefulWidget {
-  const CreateTeamScreen({super.key});
+  final String? ownerEmail;
+  final String? initialContactEmail;
+
+  const CreateTeamScreen({
+    super.key,
+    this.ownerEmail,
+    this.initialContactEmail,
+  });
   @override
   State<CreateTeamScreen> createState() => _CreateTeamScreenState();
 }
@@ -698,13 +759,47 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
     await Future.delayed(const Duration(milliseconds: 1800));
     if (mounted) {
       Navigator.pop(context);
+      final createdTeam = TeamModel(
+        id: 'team_${DateTime.now().millisecondsSinceEpoch}',
+        name: _teamName.text.trim(),
+        game: _resolveGameTitle(),
+        players: _players.map(_mapPlayerToModel).toList(),
+        status: TeamStatus.pending,
+        country: _country.trim().isEmpty ? null : _country.trim(),
+        contactEmail: _contactEmail.text.trim(),
+        description:
+            _description.text.trim().isEmpty ? null : _description.text.trim(),
+        socialLink: _social.text.trim().isEmpty ? null : _social.text.trim(),
+        ownerEmail: widget.ownerEmail?.trim().toLowerCase(),
+      );
+      await BackendService.instance.saveTeam(createdTeam);
+      if (widget.ownerEmail?.trim().isNotEmpty == true) {
+        final owner =
+            await BackendService.instance.getUserProfile(widget.ownerEmail!);
+        if (owner != null) {
+          await BackendService.instance
+              .saveUserProfile(owner.copyWith(teamId: createdTeam.id));
+        }
+        await BackendService.instance.createNotification(
+          AppNotificationModel(
+            id: 'notif_${DateTime.now().millisecondsSinceEpoch}',
+            userEmail: widget.ownerEmail!.trim().toLowerCase(),
+            title: 'Team Created',
+            body:
+                '${createdTeam.name} has been saved to your squad hub and is ready for tournament registration.',
+            type: 'team',
+            createdAt: DateTime.now(),
+            teamId: createdTeam.id,
+          ),
+        );
+      }
       HapticFeedback.heavyImpact();
       showDialog(
         context: context,
         builder: (_) => _SuccessDialog(
           onDone: () {
             Navigator.pop(context);
-            Navigator.pop(context, MockData.teams.first);
+            Navigator.pop(context, createdTeam);
           },
         ),
       );
@@ -740,6 +835,43 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
     _social.dispose();
     _customGameName.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialContactEmail?.isNotEmpty == true) {
+      _contactEmail.text = widget.initialContactEmail!;
+    }
+  }
+
+  GameTitle _resolveGameTitle() {
+    final value = _customGameName.text.trim().toLowerCase();
+    if (value.contains('ml')) return GameTitle.mlbb;
+    if (value.contains('pubg')) return GameTitle.pubg;
+    if (value.contains('free fire') || value == 'ff') return GameTitle.freeFire;
+    if (value.contains('valorant')) return GameTitle.valorant;
+    if (value.contains('cod')) return GameTitle.cod;
+    if (value.contains('football')) return GameTitle.eFootball;
+    return _isCustomGame ? GameTitle.other : _game;
+  }
+
+  PlayerModel _mapPlayerToModel(Map<String, dynamic> map) {
+    return PlayerModel(
+      id: 'player_${DateTime.now().microsecondsSinceEpoch}_${map['ign'] ?? 'x'}',
+      ign: map['ign'] as String? ?? '',
+      type: map['type'] as PlayerType? ?? PlayerType.main,
+      game: _resolveGameTitle(),
+      fullName: map['fullName'] as String?,
+      role: map['role'] as String?,
+      nationality: map['nationality'] as String?,
+      gameUID: map['gameUID'] as String?,
+      idType: map['idType'] as String?,
+      dob: map['dob'] as String?,
+      jerseyNumber: (map['jerseyNumber'] as String?)?.isNotEmpty == true
+          ? int.tryParse(map['jerseyNumber'] as String)
+          : null,
+    );
   }
 
   @override

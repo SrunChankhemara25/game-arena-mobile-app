@@ -78,10 +78,12 @@ class _AdminOverviewViewState extends State<AdminOverviewView>
     final totalUsers = DB.users.length;
     final archivedTournaments =
         DB.tournaments.where((tournament) => tournament.isArchived).length;
-    final spotlight = DB.tournaments.firstWhere(
-      (tournament) => !tournament.isArchived,
-      orElse: () => DB.tournaments.first,
-    );
+    final spotlight = DB.tournaments.isEmpty
+        ? null
+        : DB.tournaments.firstWhere(
+            (tournament) => !tournament.isArchived,
+            orElse: () => DB.tournaments.first,
+          );
     final pendingTeams = DB.tournaments
         .expand((tournament) => tournament.registrants.map((team) {
               return MapEntry(tournament, team);
@@ -140,13 +142,24 @@ class _AdminOverviewViewState extends State<AdminOverviewView>
                 const SizedBox(height: 26),
                 _animated(2, const SectionHdr(title: 'TOURNAMENT SPOTLIGHT')),
                 const SizedBox(height: 12),
-                _animated(
-                  3,
-                  _SpotlightCard(
-                    tournament: spotlight,
-                    onTap: () => widget.onNavigate?.call(1),
+                if (spotlight != null)
+                  _animated(
+                    3,
+                    _SpotlightCard(
+                      tournament: spotlight,
+                      onTap: () => widget.onNavigate?.call(1),
+                    ),
+                  )
+                else
+                  _animated(
+                    3,
+                    const EmptyState(
+                      icon: Icons.emoji_events_outlined,
+                      title: 'No tournaments yet',
+                      subtitle:
+                          'Create a tournament to populate the spotlight.',
+                    ),
                   ),
-                ),
                 const SizedBox(height: 26),
                 _animated(
                   4,

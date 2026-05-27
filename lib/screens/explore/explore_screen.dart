@@ -2,12 +2,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../theme/app_theme.dart';
 import '../../models/models.dart';
-import '../../data/mock_data.dart';
+import '../../services/backend_service.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/common/widgets.dart';
-import '../tournament/tournament_detail_screen.dart';
 import '../profile/profile_screen.dart'; // ← adjust path to match your project structure
+import '../tournament/tournament_detail_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -37,8 +37,8 @@ class ExploreScreenState extends State<ExploreScreen> {
     super.dispose();
   }
 
-  List<TournamentModel> get filteredTournaments {
-    var list = MockData.tournaments;
+  List<TournamentModel> _filteredTournaments(List<TournamentModel> source) {
+    var list = List<TournamentModel>.from(source);
 
     if (activeGameFilter != null) {
       list = list.where((t) => t.game == activeGameFilter).toList();
@@ -77,44 +77,51 @@ class ExploreScreenState extends State<ExploreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final displayTournaments = filteredTournaments;
+    return StreamBuilder<List<TournamentModel>>(
+      stream: BackendService.instance.watchTournaments(),
+      builder: (context, snapshot) {
+        final displayTournaments =
+            _filteredTournaments(snapshot.data ?? const <TournamentModel>[]);
 
-    return Scaffold(
-      backgroundColor: AppColors.bg0,
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: Stack(
-          children: [
-            _buildPremiumAmbientGlows(),
-            SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDynamicHeaderSystem(),
-                  const SizedBox(height: 16),
-                  _buildHorizontalPillFilters(),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: ListView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 120),
-                      children: [
-                        _buildEliteTournamentsDeckSection(displayTournaments),
-                        const SizedBox(height: 28),
-                        _buildDiscoverMoreSection(displayTournaments),
-                      ],
-                    ),
+        return Scaffold(
+          backgroundColor: AppColors.bg0,
+          body: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Stack(
+              children: [
+                _buildPremiumAmbientGlows(),
+                SafeArea(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDynamicHeaderSystem(),
+                      const SizedBox(height: 16),
+                      _buildHorizontalPillFilters(),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: ListView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 120),
+                          children: [
+                            _buildEliteTournamentsDeckSection(
+                                displayTournaments),
+                            const SizedBox(height: 28),
+                            _buildDiscoverMoreSection(displayTournaments),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 100.0, right: 8.0),
-        child: _buildGlowingJoinActionButton(displayTournaments),
-      ),
+          ),
+          floatingActionButton: Padding(
+            padding: const EdgeInsets.only(bottom: 100.0, right: 8.0),
+            child: _buildGlowingJoinActionButton(displayTournaments),
+          ),
+        );
+      },
     );
   }
 

@@ -1,10 +1,12 @@
-import 'dart:ui';
 import 'dart:math' as math;
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../theme/app_theme.dart';
 import '../../models/models.dart';
-import '../../data/mock_data.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend_service.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/common/widgets.dart';
 import '../admin/admin_dashboard.dart' as admin_dashboard;
 import '../auth/change_password_screen.dart';
@@ -34,62 +36,24 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   // Mutable alerts state to handle read, archive, unarchive, and deletion live
   late List<Map<String, dynamic>> _alerts;
+  StreamSubscription<List<AppNotificationModel>>? _notificationSubscription;
+  late UserModel _user;
+  bool _loading = true;
 
-  final _user = const UserModel(
-    id: 'u1',
-    name: 'Srun Chankhemara',
-    email: 'khemara@email.com',
-    country: 'Cambodia',
-    role: UserRole.user,
-    bio: 'Competitive MLBB player and team captain. Love the grind. 🎮',
-  );
+  bool get _isAdminUser => widget.isAdmin || _user.role == UserRole.admin;
 
   @override
   void initState() {
     super.initState();
 
-    _alerts = [
-      {
-        'id': '1',
-        'icon': Icons.check_circle_rounded,
-        'color': AppColors.green,
-        'title': 'Team Approved',
-        'body': 'NEXUS GAMING is approved for MPL KH Season 8.',
-        'time': '1h ago',
-        'read': false,
-        'archived': false,
-      },
-      {
-        'id': '2',
-        'icon': Icons.schedule_rounded,
-        'color': AppColors.cyan,
-        'title': 'Match Scheduled',
-        'body': 'vs PHOENIX ESPORTS — Jun 22, 14:00 GMT+7.',
-        'time': '2h ago',
-        'read': false,
-        'archived': false,
-      },
-      {
-        'id': '3',
-        'icon': Icons.notifications_rounded,
-        'color': AppColors.gold,
-        'title': 'Registration Closing',
-        'body': 'PUBG Mobile Open KH closes in 3 days.',
-        'time': '1d ago',
-        'read': true,
-        'archived': false,
-      },
-      {
-        'id': '4',
-        'icon': Icons.military_tech_rounded,
-        'color': AppColors.magenta,
-        'title': 'Match Result',
-        'body': 'NEXUS GAMING won 2–0 vs PHOENIX ESPORTS.',
-        'time': '3d ago',
-        'read': true,
-        'archived': false,
-      },
-    ];
+    _alerts = [];
+    _user = const UserModel(
+      id: 'guest',
+      name: 'Guest User',
+      email: 'guest@gamearena.gg',
+      country: 'Cambodia',
+      role: UserRole.user,
+    );
 
     _entranceCtrl = AnimationController(
       vsync: this,
@@ -105,6 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (widget.scrollToAlerts) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToAlerts());
     }
+    _loadProfile();
   }
 
   @override
@@ -112,7 +77,82 @@ class _ProfileScreenState extends State<ProfileScreen>
     _entranceCtrl.dispose();
     _pulseCtrl.dispose();
     _scrollController.dispose(); // ← NEW
+    _notificationSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    final email = await AuthService().getLoggedInUserEmail();
+    if (email != null) {
+      final profile = await BackendService.instance.getUserProfile(email);
+      _notificationSubscription?.cancel();
+      _notificationSubscription = BackendService.instance
+          .watchNotifications(email)
+          .listen((notifications) {
+        if (!mounted) return;
+        setState(() {
+          _alerts = notifications.map(_notificationToAlert).toList();
+        });
+      });
+
+      if (profile != null && mounted) {
+        setState(() {
+          _user = profile;
+          _loading = false;
+        });
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+    });
+  }
+
+  Map<String, dynamic> _notificationToAlert(AppNotificationModel notification) {
+    final style = _notificationStyle(notification.type);
+    return {
+      'id': notification.id,
+      'icon': style.icon,
+      'color': style.color,
+      'title': notification.title,
+      'body': notification.body,
+      'time':
+          BackendService.instance.formatRelativeTime(notification.createdAt),
+      'read': notification.read,
+      'archived': notification.archived,
+    };
+  }
+
+  _NotificationVisual _notificationStyle(String type) {
+    switch (type) {
+      case 'approval':
+        return const _NotificationVisual(
+          icon: Icons.check_circle_rounded,
+          color: AppColors.green,
+        );
+      case 'registration':
+        return const _NotificationVisual(
+          icon: Icons.schedule_rounded,
+          color: AppColors.cyan,
+        );
+      case 'broadcast':
+        return const _NotificationVisual(
+          icon: Icons.notifications_rounded,
+          color: AppColors.gold,
+        );
+      case 'team':
+        return const _NotificationVisual(
+          icon: Icons.groups_rounded,
+          color: AppColors.magenta,
+        );
+      default:
+        return const _NotificationVisual(
+          icon: Icons.notifications_rounded,
+          color: AppColors.cyan,
+        );
+    }
   }
 
   // ← NEW: scroll to the alerts section
@@ -134,6 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() {
       alert['read'] = true;
     });
+    BackendService.instance.markNotificationRead('${alert['id']}', true);
 
     showDialog(
       context: context,
@@ -212,6 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               setState(() {
                 _alerts.removeWhere((item) => item['id'] == alert['id']);
               });
+              BackendService.instance.deleteNotification('${alert['id']}');
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Notification deleted.')),
@@ -274,125 +316,136 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
 
           // ── Main content (Edge-to-Edge scrolling) ───────────────────
-          CustomScrollView(
-            controller: _scrollController, // ← NEW
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            slivers: [
-              SliverToBoxAdapter(
-                child: _buildTopBar(context),
+          if (_loading)
+            const Center(
+              child: CircularProgressIndicator(color: AppColors.cyan),
+            )
+          else
+            CustomScrollView(
+              controller: _scrollController, // ← NEW
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
               ),
-
-              // Identity Block
-              SliverToBoxAdapter(
-                child: _IdentityBlock(
-                  user: _user,
-                  isAdmin: widget.isAdmin,
-                  pulseCtrl: _pulseCtrl,
-                  entranceCtrl: _entranceCtrl,
-                  onAdminTap: () {
-                    HapticFeedback.mediumImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) =>
-                              const admin_dashboard.AdminDashboard()),
-                    );
-                  },
-                ),
-              ),
-
-              // Section: Active Alerts ← key added here
-              SliverToBoxAdapter(
-                child: _SectionLabel(
-                  key: _alertsSectionKey, // ← NEW
-                  label: 'ALERTS',
-                  tag: activeAlerts.length.toString(),
-                  tagColor: AppColors.cyan,
-                  entranceCtrl: _entranceCtrl,
-                  delay: 0.4,
-                ),
-              ),
-              if (activeAlerts.isEmpty)
+              slivers: [
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 24, horizontal: 24),
-                    child: Center(
-                      child: Text('No active notifications',
-                          style: AppText.caption
-                              .copyWith(color: AppColors.textMuted)),
-                    ),
-                  ),
-                )
-              else
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final alert = activeAlerts[i];
-                      return _AlertRow(
-                        key: ValueKey(alert['id']),
-                        data: alert,
-                        index: i,
-                        entranceCtrl: _entranceCtrl,
-                        onTap: () => _showAlertDetails(alert),
-                        onMenuSelected: (action) {
-                          if (action == 'read') {
-                            setState(() => alert['read'] = true);
-                          } else if (action == 'archive') {
-                            setState(() => alert['archived'] = true);
-                          } else if (action == 'delete') {
-                            _confirmDeleteAlert(alert);
-                          }
-                        },
+                  child: _buildTopBar(context),
+                ),
+
+                // Identity Block
+                SliverToBoxAdapter(
+                  child: _IdentityBlock(
+                    user: _user,
+                    isAdmin: _isAdminUser,
+                    pulseCtrl: _pulseCtrl,
+                    entranceCtrl: _entranceCtrl,
+                    onAdminTap: () {
+                      HapticFeedback.mediumImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                const admin_dashboard.AdminDashboard()),
                       );
                     },
-                    childCount: activeAlerts.length,
                   ),
                 ),
 
-              // Section: Archived Alerts
-              if (archivedAlerts.isNotEmpty) ...[
+                // Section: Active Alerts ← key added here
                 SliverToBoxAdapter(
                   child: _SectionLabel(
-                    label: 'ARCHIVED',
-                    tag: archivedAlerts.length.toString(),
-                    tagColor: AppColors.textMuted,
+                    key: _alertsSectionKey, // ← NEW
+                    label: 'ALERTS',
+                    tag: activeAlerts.length.toString(),
+                    tagColor: AppColors.cyan,
                     entranceCtrl: _entranceCtrl,
-                    delay: 0.6,
+                    delay: 0.4,
                   ),
                 ),
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final alert = archivedAlerts[i];
-                      return _AlertRow(
-                        key: ValueKey(alert['id']),
-                        data: alert,
-                        index: i + activeAlerts.length,
-                        entranceCtrl: _entranceCtrl,
-                        onTap: () => _showAlertDetails(alert),
-                        onMenuSelected: (action) {
-                          if (action == 'unarchive') {
-                            setState(() => alert['archived'] = false);
-                          } else if (action == 'delete') {
-                            _confirmDeleteAlert(alert);
-                          }
-                        },
-                      );
-                    },
-                    childCount: archivedAlerts.length,
+                if (activeAlerts.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 24, horizontal: 24),
+                      child: Center(
+                        child: Text('No active notifications',
+                            style: AppText.caption
+                                .copyWith(color: AppColors.textMuted)),
+                      ),
+                    ),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, i) {
+                        final alert = activeAlerts[i];
+                        return _AlertRow(
+                          key: ValueKey(alert['id']),
+                          data: alert,
+                          index: i,
+                          entranceCtrl: _entranceCtrl,
+                          onTap: () => _showAlertDetails(alert),
+                          onMenuSelected: (action) async {
+                            if (action == 'read') {
+                              setState(() => alert['read'] = true);
+                              await BackendService.instance
+                                  .markNotificationRead('${alert['id']}', true);
+                            } else if (action == 'archive') {
+                              setState(() => alert['archived'] = true);
+                              await BackendService.instance
+                                  .archiveNotification('${alert['id']}', true);
+                            } else if (action == 'delete') {
+                              _confirmDeleteAlert(alert);
+                            }
+                          },
+                        );
+                      },
+                      childCount: activeAlerts.length,
+                    ),
                   ),
+
+                // Section: Archived Alerts
+                if (archivedAlerts.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: _SectionLabel(
+                      label: 'ARCHIVED',
+                      tag: archivedAlerts.length.toString(),
+                      tagColor: AppColors.textMuted,
+                      entranceCtrl: _entranceCtrl,
+                      delay: 0.6,
+                    ),
+                  ),
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, i) {
+                        final alert = archivedAlerts[i];
+                        return _AlertRow(
+                          key: ValueKey(alert['id']),
+                          data: alert,
+                          index: i + activeAlerts.length,
+                          entranceCtrl: _entranceCtrl,
+                          onTap: () => _showAlertDetails(alert),
+                          onMenuSelected: (action) async {
+                            if (action == 'unarchive') {
+                              setState(() => alert['archived'] = false);
+                              await BackendService.instance
+                                  .archiveNotification('${alert['id']}', false);
+                            } else if (action == 'delete') {
+                              _confirmDeleteAlert(alert);
+                            }
+                          },
+                        );
+                      },
+                      childCount: archivedAlerts.length,
+                    ),
+                  ),
+                ],
+
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                      height: 120 + MediaQuery.of(context).padding.bottom),
                 ),
               ],
-
-              SliverToBoxAdapter(
-                child: SizedBox(
-                    height: 120 + MediaQuery.of(context).padding.bottom),
-              ),
-            ],
-          ),
+            ),
         ],
       ),
     );
@@ -446,20 +499,33 @@ class _ProfileScreenState extends State<ProfileScreen>
           const Spacer(),
           _IconBtn(
             icon: Icons.settings_rounded,
-            onTap: () {
+            onTap: () async {
               HapticFeedback.lightImpact();
-              Navigator.push(
+              final updated = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => SettingsScreen(user: _user),
                 ),
               );
+              if (updated == true) {
+                await _loadProfile();
+              }
             },
           ),
         ],
       ),
     );
   }
+}
+
+class _NotificationVisual {
+  final IconData icon;
+  final Color color;
+
+  const _NotificationVisual({
+    required this.icon,
+    required this.color,
+  });
 }
 
 // ─── Identity Block ───────────────────────────────────────────────────────────
@@ -967,8 +1033,15 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _notificationsEnabled = true;
-  bool _emailUpdatesEnabled = true;
+  late bool _notificationsEnabled;
+  late bool _emailUpdatesEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationsEnabled = widget.user.notificationsEnabled;
+    _emailUpdatesEnabled = widget.user.emailUpdatesEnabled;
+  }
 
   void _confirmLogout() {
     HapticFeedback.mediumImpact();
@@ -1006,11 +1079,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 colors: [AppColors.red, AppColors.red.withOpacity(0.7)]),
             onTap: () {
               HapticFeedback.heavyImpact();
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (_) => false,
-              );
+              AuthService().clearUserSession().then((_) {
+                if (!mounted) return;
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (_) => false,
+                );
+              });
             },
           ),
         ],
@@ -1038,13 +1114,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsTile(
                 icon: Icons.person_rounded,
                 label: 'Edit Profile',
-                onTap: () {
+                onTap: () async {
                   HapticFeedback.lightImpact();
-                  Navigator.push(
+                  final updated = await Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
                         builder: (_) => EditProfileScreen(user: widget.user)),
                   );
+                  if (updated == true && mounted) {
+                    Navigator.pop(context, true);
+                  }
                 },
               ),
               _SettingsTile(
@@ -1078,6 +1157,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (v) {
                     HapticFeedback.lightImpact();
                     setState(() => _notificationsEnabled = v);
+                    AuthService().updateUserPreferences(
+                      email: widget.user.email,
+                      notificationsEnabled: _notificationsEnabled,
+                      emailUpdatesEnabled: _emailUpdatesEnabled,
+                    );
                   },
                   activeColor: AppColors.cyan,
                   activeTrackColor: AppColors.cyan.withOpacity(0.3),
@@ -1094,6 +1178,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (v) {
                     HapticFeedback.lightImpact();
                     setState(() => _emailUpdatesEnabled = v);
+                    AuthService().updateUserPreferences(
+                      email: widget.user.email,
+                      notificationsEnabled: _notificationsEnabled,
+                      emailUpdatesEnabled: _emailUpdatesEnabled,
+                    );
                   },
                   activeColor: AppColors.cyan,
                   activeTrackColor: AppColors.cyan.withOpacity(0.3),
@@ -1275,9 +1364,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
     HapticFeedback.mediumImpact();
-    await Future.delayed(const Duration(milliseconds: 600));
+    await AuthService().updateUserProfile(
+      email: widget.user.email,
+      name: _nameController.text.trim(),
+      country: _countryController.text.trim(),
+      bio: _bioController.text.trim(),
+    );
     if (!mounted) return;
-    Navigator.pop(context);
+    Navigator.pop(context, true);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Profile updated successfully.')),
     );

@@ -89,6 +89,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen>
         country: _selectedCountry!,
         password: '',
       );
+      await AuthService().saveUserSession(widget.email);
 
       if (!mounted) return;
       HapticFeedback.successNotification();

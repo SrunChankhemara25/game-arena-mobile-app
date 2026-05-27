@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend_service.dart';
 import '../../theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../widgets/common/widgets.dart';
@@ -1641,7 +1643,9 @@ class _RegisterTeamScreen extends StatefulWidget {
 class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _submitted = false;
+  bool _submitting = false;
   int _currentStep = 0;
+  final List<_DynamicPlayerItem> _roster = [];
 
   final _teamNameCtrl = TextEditingController();
   final _teamTagCtrl = TextEditingController();
@@ -1659,6 +1663,13 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _addNewPlayer(isFirst: true);
+    _prefillContact();
+  }
+
+  @override
   void dispose() {
     _teamNameCtrl.dispose();
     _teamTagCtrl.dispose();
@@ -1667,7 +1678,51 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
     _contactPhoneCtrl.dispose();
     _coachNameCtrl.dispose();
     _asstCoachNameCtrl.dispose();
+    for (final player in _roster) {
+      player.fullNameCtrl.dispose();
+      player.ignCtrl.dispose();
+      player.uidCtrl.dispose();
+      player.nationalityCtrl.dispose();
+      player.dobCtrl.dispose();
+      player.roleCtrl.dispose();
+    }
     super.dispose();
+  }
+
+  void _addNewPlayer({bool isFirst = false}) {
+    _roster.add(
+      _DynamicPlayerItem(
+        fullNameCtrl: TextEditingController(),
+        ignCtrl: TextEditingController(),
+        uidCtrl: TextEditingController(),
+        nationalityCtrl: TextEditingController(),
+        dobCtrl: TextEditingController(),
+        roleCtrl: TextEditingController(),
+        isSub: false,
+        isCaptain: isFirst,
+      ),
+    );
+  }
+
+  void _removePlayer(int index) {
+    final player = _roster.removeAt(index);
+    player.fullNameCtrl.dispose();
+    player.ignCtrl.dispose();
+    player.uidCtrl.dispose();
+    player.nationalityCtrl.dispose();
+    player.dobCtrl.dispose();
+    player.roleCtrl.dispose();
+  }
+
+  Future<void> _prefillContact() async {
+    final email = await AuthService().getLoggedInUserEmail();
+    if (email == null) return;
+    final user = await BackendService.instance.getUserProfile(email);
+    if (!mounted) return;
+    _contactEmailCtrl.text = email;
+    if (user?.name.isNotEmpty == true && _founderNameCtrl.text.isEmpty) {
+      _founderNameCtrl.text = user!.name;
+    }
   }
 
   @override
@@ -1737,13 +1792,12 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
             currentStep: _currentStep,
             totalSteps: _steps.length,
             onBack: () => setState(() => _currentStep--),
-            onNext: () {
+            onNext: () async {
               if (_currentStep < _steps.length - 1) {
                 setState(() => _currentStep++);
               } else {
                 if (_formKey.currentState!.validate()) {
-                  HapticFeedback.vibrate();
-                  setState(() => _submitted = true);
+                  await _submitRegistration();
                 } else {
                   HapticFeedback.heavyImpact();
                 }
@@ -1778,9 +1832,114 @@ class _RegisterTeamScreenState extends State<_RegisterTeamScreen> {
         ),
       _ => _Step4Roster(
           key: const ValueKey(3),
+          roster: _roster,
           onUpload: () => _showUploadSnack(),
+          onAddPlayer: () => setState(() => _addNewPlayer()),
+          onRemovePlayer: (index) => setState(() => _removePlayer(index)),
+          onTogglePosition: (index, isSubValue) {
+            setState(() {
+              _roster[index].isSub = isSubValue;
+              if (isSubValue) {
+                _roster[index].isCaptain = false;
+              }
+            });
+          },
+          onToggleCaptain: (index, isCaptainValue) {
+            setState(() {
+              if (isCaptainValue) {
+                for (final player in _roster) {
+                  player.isCaptain = false;
+                }
+                _roster[index].isSub = false;
+              }
+              _roster[index].isCaptain = isCaptainValue;
+            });
+          },
         ),
     };
+  }
+
+  Future<void> _submitRegistration() async {
+    if (_submitting) return;
+    if (_roster.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add at least one player to the roster.')),
+      );
+      return;
+    }
+
+    final ownerEmail = await AuthService().getLoggedInUserEmail();
+    final existingTeam = ownerEmail == null
+        ? null
+        : await BackendService.instance.getTeamByOwner(ownerEmail);
+    final ownerProfile = ownerEmail == null
+        ? null
+        : await BackendService.instance.getUserProfile(ownerEmail);
+
+    setState(() => _submitting = true);
+    HapticFeedback.mediumImpact();
+
+    final registrationTeam = TeamModel(
+      id: existingTeam?.id ?? 'team_${DateTime.now().millisecondsSinceEpoch}',
+      name: _teamNameCtrl.text.trim(),
+      logoUrl: existingTeam?.logoUrl,
+      game: widget.tournament.game,
+      players: _roster.asMap().entries.map((entry) {
+        final index = entry.key;
+        final player = entry.value;
+        return PlayerModel(
+          id: 'player_${DateTime.now().microsecondsSinceEpoch}_$index',
+          ign: player.ignCtrl.text.trim(),
+          fullName: player.fullNameCtrl.text.trim(),
+          type: player.isCaptain || !player.isSub
+              ? PlayerType.main
+              : PlayerType.substitute,
+          game: widget.tournament.game,
+          nationality: player.nationalityCtrl.text.trim(),
+          gameUID: player.uidCtrl.text.trim(),
+          dob: player.dobCtrl.text.trim(),
+          role: player.roleCtrl.text.trim(),
+        );
+      }).toList(),
+      status: TeamStatus.pending,
+      country: ownerProfile?.country ?? existingTeam?.country,
+      contactEmail: _contactEmailCtrl.text.trim(),
+      contactInfo: _contactPhoneCtrl.text.trim(),
+      description: existingTeam?.description,
+      socialLink: existingTeam?.socialLink,
+      teamTag: _teamTagCtrl.text.trim(),
+      ownerEmail: ownerEmail,
+      founderName: _founderNameCtrl.text.trim(),
+      managerName: _founderNameCtrl.text.trim(),
+      coachName: _coachNameCtrl.text.trim(),
+      assistantCoachName: _asstCoachNameCtrl.text.trim(),
+      contactPhone: _contactPhoneCtrl.text.trim(),
+      registeredTournamentIds: {
+        ...?existingTeam?.registeredTournamentIds,
+        widget.tournament.id,
+      }.toList(),
+    );
+
+    try {
+      await BackendService.instance.registerTeamForTournament(
+        tournamentId: widget.tournament.id,
+        team: registrationTeam,
+      );
+      if (!mounted) return;
+      HapticFeedback.vibrate();
+      setState(() {
+        _submitting = false;
+        _submitted = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to submit roster right now. Please try again.'),
+        ),
+      );
+    }
   }
 
   void _showUploadSnack() {
@@ -2106,56 +2265,23 @@ class _Step3Coaching extends StatelessWidget {
 }
 
 // ─── Step 4: Player Roster ────────────────────────────────────────────────────
-class _Step4Roster extends StatefulWidget {
+class _Step4Roster extends StatelessWidget {
+  final List<_DynamicPlayerItem> roster;
   final VoidCallback onUpload;
-  const _Step4Roster({super.key, required this.onUpload});
+  final VoidCallback onAddPlayer;
+  final ValueChanged<int> onRemovePlayer;
+  final void Function(int index, bool isSubValue) onTogglePosition;
+  final void Function(int index, bool isCaptainValue) onToggleCaptain;
 
-  @override
-  State<_Step4Roster> createState() => _Step4RosterState();
-}
-
-class _Step4RosterState extends State<_Step4Roster> {
-  final List<_DynamicPlayerItem> _roster = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _addNewPlayer(isFirst: true);
-  }
-
-  void _addNewPlayer({bool isFirst = false}) {
-    setState(() {
-      _roster.add(
-        _DynamicPlayerItem(
-          fullNameCtrl: TextEditingController(),
-          ignCtrl: TextEditingController(),
-          uidCtrl: TextEditingController(),
-          nationalityCtrl: TextEditingController(),
-          dobCtrl: TextEditingController(),
-          roleCtrl: TextEditingController(),
-          isSub: false,
-          isCaptain: isFirst,
-        ),
-      );
-    });
-  }
-
-  void _removePlayer(int index) {
-    setState(() => _roster.removeAt(index));
-  }
-
-  @override
-  void dispose() {
-    for (var player in _roster) {
-      player.fullNameCtrl.dispose();
-      player.ignCtrl.dispose();
-      player.uidCtrl.dispose();
-      player.nationalityCtrl.dispose();
-      player.dobCtrl.dispose();
-      player.roleCtrl.dispose();
-    }
-    super.dispose();
-  }
+  const _Step4Roster({
+    super.key,
+    required this.roster,
+    required this.onUpload,
+    required this.onAddPlayer,
+    required this.onRemovePlayer,
+    required this.onTogglePosition,
+    required this.onToggleCaptain,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2181,7 +2307,7 @@ class _Step4RosterState extends State<_Step4Roster> {
           ]),
         ),
         const SizedBox(height: 20),
-        if (_roster.isEmpty)
+        if (roster.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(32),
@@ -2199,36 +2325,23 @@ class _Step4RosterState extends State<_Step4Roster> {
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _roster.length,
+            itemCount: roster.length,
             itemBuilder: (context, index) {
               return _PlayerEntryForm(
                 index: index,
-                item: _roster[index],
-                onRemove: () => _removePlayer(index),
-                onUpload: widget.onUpload,
-                onTogglePosition: (isSubValue) {
-                  setState(() {
-                    _roster[index].isSub = isSubValue;
-                    if (isSubValue) _roster[index].isCaptain = false;
-                  });
-                },
-                onToggleCaptain: (isCaptainValue) {
-                  setState(() {
-                    if (isCaptainValue) {
-                      for (var p in _roster) {
-                        p.isCaptain = false;
-                      }
-                      _roster[index].isSub = false;
-                    }
-                    _roster[index].isCaptain = isCaptainValue;
-                  });
-                },
+                item: roster[index],
+                onRemove: () => onRemovePlayer(index),
+                onUpload: onUpload,
+                onTogglePosition: (isSubValue) =>
+                    onTogglePosition(index, isSubValue),
+                onToggleCaptain: (isCaptainValue) =>
+                    onToggleCaptain(index, isCaptainValue),
               );
             },
           ),
         const SizedBox(height: 12),
         GestureDetector(
-          onTap: () => _addNewPlayer(),
+          onTap: onAddPlayer,
           child: Container(
             width: double.infinity,
             height: 52,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../models/models.dart';
-import '../../data/mock_data.dart';
+import '../../services/backend_service.dart';
 import '../../widgets/common/widgets.dart';
 import 'tournament_detail_screen.dart';
 
@@ -24,8 +24,9 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     super.dispose();
   }
 
-  List<TournamentModel> _getFiltered(TournamentStatus? status) {
-    var list = MockData.tournaments;
+  List<TournamentModel> _getFiltered(
+      List<TournamentModel> tournaments, TournamentStatus? status) {
+    var list = List<TournamentModel>.from(tournaments);
     if (status != null) list = list.where((t) => t.status == status).toList();
     if (_gameFilter != null) {
       list = list.where((t) => t.game == _gameFilter).toList();
@@ -41,59 +42,70 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ── FIX: Wrapping the Scaffold in DefaultTabController prevents Hot Reload crashes! ──
-    return DefaultTabController(
-      length: 4, // Exactly 4 tabs
-      child: Scaffold(
-        backgroundColor: AppColors.bg0,
-        appBar: AppBar(
-          backgroundColor: AppColors.bg0,
-          title: Text('TOURNAMENTS',
-              style: AppText.heading.copyWith(letterSpacing: 1)),
-          actions: [
-            IconButton(
-                icon: const Icon(Icons.filter_list_rounded,
-                    color: AppColors.textSecondary),
-                onPressed: _showFilterSheet),
-          ],
-          bottom: TabBar(
-            // controller: _tab, <-- Removed! DefaultTabController links it automatically.
-            indicatorColor: AppColors.cyan,
-            labelStyle:
-                AppText.btnSm.copyWith(color: AppColors.cyan, fontSize: 12),
-            unselectedLabelStyle: AppText.btnSm
-                .copyWith(color: AppColors.textMuted, fontSize: 12),
-            tabs: const [
-              Tab(text: 'ALL'),
-              Tab(text: 'LIVE'),
-              Tab(text: 'OPEN'),
-              Tab(text: 'UPCOMING'),
-            ],
-          ),
-        ),
-        body: Column(children: [
-          Padding(
-              padding: const EdgeInsets.all(16),
-              child: AppSearchBar(
-                  controller: _search,
-                  hint: 'Search tournaments...',
-                  onChanged: (_) => setState(() {}))),
-          Expanded(
-            child: TabBarView(
-              // controller: _tab, <-- Removed! DefaultTabController links it automatically.
-              children: [
-                _TournamentList(tournaments: _getFiltered(null)),
-                _TournamentList(
-                    tournaments: _getFiltered(TournamentStatus.ongoing)),
-                _TournamentList(
-                    tournaments: _getFiltered(TournamentStatus.registration)),
-                _TournamentList(
-                    tournaments: _getFiltered(TournamentStatus.upcoming)),
+    return StreamBuilder<List<TournamentModel>>(
+      stream: BackendService.instance.watchTournaments(),
+      builder: (context, snapshot) {
+        final tournaments = snapshot.data ?? const <TournamentModel>[];
+
+        // ── FIX: Wrapping the Scaffold in DefaultTabController prevents Hot Reload crashes! ──
+        return DefaultTabController(
+          length: 4, // Exactly 4 tabs
+          child: Scaffold(
+            backgroundColor: AppColors.bg0,
+            appBar: AppBar(
+              backgroundColor: AppColors.bg0,
+              title: Text('TOURNAMENTS',
+                  style: AppText.heading.copyWith(letterSpacing: 1)),
+              actions: [
+                IconButton(
+                    icon: const Icon(Icons.filter_list_rounded,
+                        color: AppColors.textSecondary),
+                    onPressed: _showFilterSheet),
               ],
+              bottom: TabBar(
+                // controller: _tab, <-- Removed! DefaultTabController links it automatically.
+                indicatorColor: AppColors.cyan,
+                labelStyle:
+                    AppText.btnSm.copyWith(color: AppColors.cyan, fontSize: 12),
+                unselectedLabelStyle: AppText.btnSm
+                    .copyWith(color: AppColors.textMuted, fontSize: 12),
+                tabs: const [
+                  Tab(text: 'ALL'),
+                  Tab(text: 'LIVE'),
+                  Tab(text: 'OPEN'),
+                  Tab(text: 'UPCOMING'),
+                ],
+              ),
             ),
+            body: Column(children: [
+              Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: AppSearchBar(
+                      controller: _search,
+                      hint: 'Search tournaments...',
+                      onChanged: (_) => setState(() {}))),
+              Expanded(
+                child: TabBarView(
+                  // controller: _tab, <-- Removed! DefaultTabController links it automatically.
+                  children: [
+                    _TournamentList(
+                        tournaments: _getFiltered(tournaments, null)),
+                    _TournamentList(
+                        tournaments: _getFiltered(
+                            tournaments, TournamentStatus.ongoing)),
+                    _TournamentList(
+                        tournaments: _getFiltered(
+                            tournaments, TournamentStatus.registration)),
+                    _TournamentList(
+                        tournaments: _getFiltered(
+                            tournaments, TournamentStatus.upcoming)),
+                  ],
+                ),
+              ),
+            ]),
           ),
-        ]),
-      ),
+        );
+      },
     );
   }
 

@@ -16,6 +16,16 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
   final _titleCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
 
+  final List<_BroadcastRecord> _history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    DB.initialize().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -30,12 +40,11 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-        // BouncingScrollPhysics gives smooth iOS-style overscroll
-        // without any layout expansion on scroll
         physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header card ──────────────────────────────────────────────
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -76,6 +85,8 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
               ),
             ),
             const SizedBox(height: 24),
+
+            // ── Target ───────────────────────────────────────────────────
             const SectionHdr(title: 'TARGET'),
             Container(
               padding: const EdgeInsets.all(18),
@@ -113,6 +124,8 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedEmail,
+                      isDense: true,
+                      isExpanded: true,
                       dropdownColor: AC.bg3,
                       style: const TextStyle(
                         color: AC.textPrimary,
@@ -159,6 +172,8 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
               ),
             ),
             const SizedBox(height: 24),
+
+            // ── Message ──────────────────────────────────────────────────
             const SectionHdr(title: 'MESSAGE'),
             Container(
               padding: const EdgeInsets.all(18),
@@ -189,6 +204,8 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
               ),
             ),
             const SizedBox(height: 24),
+
+            // ── Preview ──────────────────────────────────────────────────
             const SectionHdr(title: 'PREVIEW'),
             Container(
               width: double.infinity,
@@ -238,24 +255,65 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
               ),
             ),
             const SizedBox(height: 26),
+
+            // ── Send button ──────────────────────────────────────────────
             GradButton(
               label: 'SEND NOTIFICATION',
               width: double.infinity,
               icon: Icons.send_rounded,
               onTap: _sendBroadcast,
             ),
+            const SizedBox(height: 32),
+
+            // ── History ──────────────────────────────────────────────────
+            if (_history.isNotEmpty) ...[
+              const SectionHdr(title: 'HISTORY'),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _history.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final record = _history[_history.length - 1 - index];
+                  return _BroadcastHistoryTile(
+                    record: record,
+                    onDelete: () => _confirmDelete(record),
+                    onTap: () => _showDetail(record),
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  void _sendBroadcast() {
+  void _sendBroadcast() async {
     final message = _messageCtrl.text.trim();
     final target = _emailCtrl.text.trim();
 
     if (message.isEmpty) return;
     if (!_toAll && target.isEmpty) return;
+
+    await DB.sendBroadcast(
+      title: _titleCtrl.text.trim(),
+      message: message,
+      email: _toAll ? null : target,
+    );
+
+    setState(() {
+      _history.add(
+        _BroadcastRecord(
+          title: _titleCtrl.text.trim().isEmpty
+              ? 'GameArena Update'
+              : _titleCtrl.text.trim(),
+          message: message,
+          recipient: _toAll ? 'All users' : target,
+          sentAt: DateTime.now(),
+        ),
+      );
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -272,16 +330,338 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
 
     _titleCtrl.clear();
     _messageCtrl.clear();
-    if (!_toAll) {
-      _emailCtrl.clear();
-    }
+    if (!_toAll) _emailCtrl.clear();
     setState(() {
-      if (!_toAll) {
-        _selectedEmail = null;
-      }
+      if (!_toAll) _selectedEmail = null;
     });
   }
+
+  void _confirmDelete(_BroadcastRecord record) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AC.bg2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Broadcast?', style: AT.subheading),
+        content: Text(
+          'Are you sure you want to delete "${record.title}"? This cannot be undone.',
+          style: AT.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: AT.body.copyWith(color: AC.textMuted)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              setState(() => _history.remove(record));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Broadcast deleted'),
+                  backgroundColor: AC.bg3,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              );
+            },
+            child:
+                const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDetail(_BroadcastRecord record) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _BroadcastDetailSheet(record: record),
+    );
+  }
 }
+
+// ── Data model ────────────────────────────────────────────────────────────────
+
+class _BroadcastRecord {
+  final String title;
+  final String message;
+  final String recipient;
+  final DateTime sentAt;
+
+  _BroadcastRecord({
+    required this.title,
+    required this.message,
+    required this.recipient,
+    required this.sentAt,
+  });
+}
+
+// ── Detail bottom sheet ───────────────────────────────────────────────────────
+
+class _BroadcastDetailSheet extends StatelessWidget {
+  final _BroadcastRecord record;
+
+  const _BroadcastDetailSheet({required this.record});
+
+  String _formatFull(DateTime dt) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}  •  $h:$m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AC.bg1,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        20,
+        24,
+        24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AC.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Title row
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AC.cyan.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.campaign_rounded,
+                    color: AC.cyan, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(record.title, style: AT.heading),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Info chips row
+          Row(
+            children: [
+              _InfoChip(
+                icon: Icons.people_rounded,
+                label: record.recipient,
+              ),
+              const SizedBox(width: 10),
+              _InfoChip(
+                icon: Icons.access_time_rounded,
+                label: _formatFull(record.sentAt),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Divider
+          Divider(color: AC.border, thickness: 1),
+          const SizedBox(height: 16),
+
+          // Message label
+          Text('MESSAGE', style: AT.caption.copyWith(letterSpacing: 1.2)),
+          const SizedBox(height: 10),
+
+          // Message body
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: cardDecor(),
+            child: Text(record.message, style: AT.body),
+          ),
+          const SizedBox(height: 24),
+
+          // Close button
+          GradButton(
+            label: 'CLOSE',
+            width: double.infinity,
+            icon: Icons.close_rounded,
+            onTap: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Info chip ─────────────────────────────────────────────────────────────────
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _InfoChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AC.bg3,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AC.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AC.cyan, size: 13),
+          const SizedBox(width: 6),
+          Text(label,
+              style: AT.caption.copyWith(color: AC.textMuted, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── History tile ──────────────────────────────────────────────────────────────
+
+class _BroadcastHistoryTile extends StatelessWidget {
+  final _BroadcastRecord record;
+  final VoidCallback onDelete;
+  final VoidCallback onTap;
+
+  const _BroadcastHistoryTile({
+    required this.record,
+    required this.onDelete,
+    required this.onTap,
+  });
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+        decoration: cardDecor(),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AC.cyan.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child:
+                  const Icon(Icons.campaign_rounded, color: AC.cyan, size: 18),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(record.title, style: AT.subheading),
+                  const SizedBox(height: 2),
+                  Text(
+                    record.message,
+                    style: AT.body.copyWith(fontSize: 13),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.people_rounded,
+                          color: AC.textMuted, size: 12),
+                      const SizedBox(width: 4),
+                      Text(record.recipient,
+                          style: AT.caption.copyWith(color: AC.cyan)),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.access_time_rounded,
+                          color: AC.textMuted, size: 12),
+                      const SizedBox(width: 4),
+                      Text(_formatDate(record.sentAt), style: AT.caption),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Three-dot menu
+            PopupMenuButton<String>(
+              color: AC.bg3,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              icon: const Icon(Icons.more_vert_rounded,
+                  color: AC.textMuted, size: 20),
+              onSelected: (value) {
+                if (value == 'delete') onDelete();
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.delete_outline_rounded,
+                          color: Colors.redAccent, size: 18),
+                      const SizedBox(width: 10),
+                      Text('Delete',
+                          style: AT.body.copyWith(color: Colors.redAccent)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Target toggle ─────────────────────────────────────────────────────────────
 
 class _TargetToggle extends StatelessWidget {
   final String label;

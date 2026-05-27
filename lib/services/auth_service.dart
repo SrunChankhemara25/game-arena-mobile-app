@@ -4,6 +4,8 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // <-- 1. ADDED THIS IMPORT
+import '../models/models.dart';
+import 'backend_service.dart';
 
 class AuthService {
   // ─── FIREBASE CLOUD FIRESTORE INSTANCE ───
@@ -102,16 +104,37 @@ class AuthService {
     required String name,
     required String country,
     required String password,
+    UserRole role = UserRole.user,
   }) async {
     final String cleanEmail = email.toLowerCase().trim();
 
     await _db.collection('users').doc(cleanEmail).set({
+      'id': cleanEmail,
       'email': cleanEmail,
       'name': name,
       'country': country,
+      'role': role.name,
+      'status': 'active',
+      'bio': '',
+      'avatarUrl': null,
+      'teamId': null,
+      'notificationsEnabled': true,
+      'emailUpdatesEnabled': true,
       'password': _preparePassword(password),
-      'created_at': FieldValue.serverTimestamp(),
-    });
+      'createdAt': DateTime.now().toIso8601String(),
+    }, SetOptions(merge: true));
+
+    await BackendService.instance.createNotification(
+      AppNotificationModel(
+        id: 'notif_${DateTime.now().millisecondsSinceEpoch}',
+        userEmail: cleanEmail,
+        title: 'Welcome to GameArena',
+        body:
+            'Your account is ready. Build your squad and join your first tournament.',
+        type: 'welcome',
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   /// 5. LOGIN EXISTING USER: CHECKS FIRESTORE IF ACCOUNT IS VALID
@@ -158,5 +181,65 @@ class AuthService {
   Future<void> clearUserSession() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove('logged_in_user_email');
+  }
+
+  Future<UserModel?> getUserProfile(String email) {
+    return BackendService.instance.getUserProfile(email);
+  }
+
+  Future<String> getUserRole(String email) async {
+    final user = await BackendService.instance.getUserProfile(email);
+    return user?.role.name ?? UserRole.user.name;
+  }
+
+  Future<void> updateUserProfile({
+    required String email,
+    required String name,
+    required String country,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    final cleanEmail = email.toLowerCase().trim();
+    final existing = await BackendService.instance.getUserProfile(cleanEmail);
+    final user = (existing ??
+            UserModel(
+              id: cleanEmail,
+              name: name,
+              email: cleanEmail,
+              country: country,
+            ))
+        .copyWith(
+      name: name,
+      country: country,
+      bio: bio,
+      avatarUrl: avatarUrl,
+    );
+    await BackendService.instance.saveUserProfile(user);
+  }
+
+  Future<void> updateUserPreferences({
+    required String email,
+    required bool notificationsEnabled,
+    required bool emailUpdatesEnabled,
+  }) async {
+    final cleanEmail = email.toLowerCase().trim();
+    final existing = await BackendService.instance.getUserProfile(cleanEmail);
+    if (existing == null) return;
+    await BackendService.instance.saveUserProfile(
+      existing.copyWith(
+        notificationsEnabled: notificationsEnabled,
+        emailUpdatesEnabled: emailUpdatesEnabled,
+      ),
+    );
+  }
+
+  Future<void> changePassword({
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final cleanEmail = email.toLowerCase().trim();
+    await loginUser(cleanEmail, currentPassword);
+    await resetPassword(cleanEmail, newPassword);
   }
 }

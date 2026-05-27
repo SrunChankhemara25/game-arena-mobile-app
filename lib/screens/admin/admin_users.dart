@@ -13,6 +13,14 @@ class _AdminUsersViewState extends State<AdminUsersView> {
   String _search = '';
 
   @override
+  void initState() {
+    super.initState();
+    DB.initialize().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final users = DB.users.where((user) {
       final query = _search.trim().toLowerCase();
@@ -178,6 +186,8 @@ class _AdminUsersViewState extends State<AdminUsersView> {
                                           ? UserStatus.suspended
                                           : UserStatus.active;
                                     });
+                                    await DB.updateUser(user);
+                                    if (mounted) setState(() {});
                                   } else if (value == 'delete') {
                                     await _deleteUser(user);
                                   }
@@ -219,7 +229,8 @@ class _AdminUsersViewState extends State<AdminUsersView> {
 
     if (!confirm) return;
 
-    setState(() => DB.users.remove(user));
+    await DB.deleteUser(user.email);
+    if (mounted) setState(() {});
   }
 }
 

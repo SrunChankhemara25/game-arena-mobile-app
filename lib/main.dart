@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'services/backend_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 
@@ -8,8 +10,10 @@ void main() async {
   // Ensures all native plugin channels are fully prepared before initializing async methods
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase using your native android/app/google-services.json file configuration
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await BackendService.instance.bootstrap();
 
   // Lock the device to portrait mode
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

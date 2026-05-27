@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../models/models.dart';
+import '../../services/backend_service.dart';
 
 class AC {
   static const bg0 = Color(0xFF0B0E1A);
@@ -715,6 +717,483 @@ class DB {
       standings: [],
     ),
   ];
+
+  static bool _initialized = false;
+
+  static Future<void> initialize({bool force = false}) async {
+    if (_initialized && !force) return;
+    await BackendService.instance.bootstrap();
+    await refresh();
+    _initialized = true;
+  }
+
+  static Future<void> refresh() async {
+    final userProfiles = await BackendService.instance.getUsers();
+    final tournamentModels = await BackendService.instance.getTournaments();
+
+    users = userProfiles.map(_userFromProfile).toList();
+    tournaments = tournamentModels.map(_tournamentFromModel).toList();
+  }
+
+  static Future<void> saveTournament(Tournament tournament) async {
+    final previous = await BackendService.instance.getTournament(tournament.id);
+    final model = _modelFromTournament(tournament, previous: previous);
+    await BackendService.instance.saveTournament(model);
+    await refresh();
+  }
+
+  static Future<void> deleteTournament(String tournamentId) async {
+    await BackendService.instance.deleteTournament(tournamentId);
+    await refresh();
+  }
+
+  static Future<void> setTournamentArchived(
+      String tournamentId, bool isArchived) async {
+    await BackendService.instance
+        .setTournamentArchived(tournamentId, isArchived);
+    await refresh();
+  }
+
+  static Future<void> updateTeamApproval({
+    required String tournamentId,
+    required String teamId,
+    required ApprovalState state,
+  }) async {
+    await BackendService.instance.updateTeamApproval(
+      tournamentId: tournamentId,
+      teamId: teamId,
+      status: _teamStatusFromApproval(state),
+    );
+    await refresh();
+  }
+
+  static Future<void> updateUser(AppUser user) async {
+    final existing = await BackendService.instance.getUserProfile(user.email);
+    if (existing == null) return;
+    await BackendService.instance.saveUserProfile(
+      existing.copyWith(
+        name: user.name,
+        country: user.country,
+        role: _roleFromLabel(user.role),
+        status: user.status == UserStatus.suspended ? 'suspended' : 'active',
+      ),
+    );
+    await refresh();
+  }
+
+  static Future<void> deleteUser(String email) async {
+    await BackendService.instance.deleteUser(email);
+    await refresh();
+  }
+
+  static Future<void> sendBroadcast({
+    required String title,
+    required String message,
+    String? email,
+  }) async {
+    await BackendService.instance.sendBroadcast(
+      title: title,
+      message: message,
+      targetEmail: email,
+    );
+  }
+
+  static AppUser _userFromProfile(UserModel user) {
+    return AppUser(
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role.label,
+      country: user.country,
+      status:
+          user.status == 'suspended' ? UserStatus.suspended : UserStatus.active,
+    );
+  }
+
+  static Tournament _tournamentFromModel(TournamentModel model) {
+    final registrants = model.teams.map((team) {
+      return TeamReg(
+        id: team.id,
+        teamName: team.name,
+        region: team.country ?? 'Global',
+        roster: team.players.map((player) => player.ign).toList(),
+        coach: team.coachName?.isNotEmpty == true
+            ? team.coachName
+            : _firstPlayerName(team, PlayerType.coach),
+        assistantCoach: team.assistantCoachName?.isNotEmpty == true
+            ? team.assistantCoachName
+            : _firstPlayerName(team, PlayerType.assistantCoach),
+        manager: team.managerName ?? team.founderName,
+        note: team.description,
+        state: _approvalFromTeamStatus(team.status),
+      );
+    }).toList();
+
+    final schedules = model.matches
+        .map(
+          (match) => ScheduleEntry(
+            id: match.id,
+            round: match.round,
+            teamA: _teamNameForId(model, match.team1Id),
+            teamB: _teamNameForId(model, match.team2Id),
+            date: _datePart(match.scheduledAt),
+            time: _timePart(match.scheduledAt),
+          ),
+        )
+        .toList();
+
+    final bracketRounds = <BracketRound>[];
+    final grouped = <String, List<MatchModel>>{};
+    for (final match in model.matches) {
+      grouped.putIfAbsent(match.round, () => []).add(match);
+    }
+    grouped.forEach((round, matches) {
+      bracketRounds.add(
+        BracketRound(
+          id: 'round_${round.hashCode}',
+          roundName: round,
+          matches: matches
+              .map(
+                (match) => MatchNode(
+                  id: match.id,
+                  teamA: _teamNameForId(model, match.team1Id),
+                  teamB: _teamNameForId(model, match.team2Id),
+                  scoreA: match.score1,
+                  scoreB: match.score2,
+                  date: _datePart(match.scheduledAt),
+                  time: _timePart(match.scheduledAt),
+                  winner: _teamNameForId(model, match.winnerId),
+                  isFinalized: match.status == 'completed',
+                ),
+              )
+              .toList(),
+        ),
+      );
+    });
+
+    final standings = model.standings
+        .map(
+          (standing) => StandingEntry(
+            id: standing.teamId,
+            teamName: standing.teamName,
+            played: standing.played,
+            wins: standing.wins,
+            losses: standing.losses,
+            points: standing.points,
+            gameWins: standing.wins,
+            gameLosses: standing.losses,
+          ),
+        )
+        .toList();
+
+    return Tournament(
+      id: model.id,
+      title: model.title,
+      game: _gameCtxFromTitle(model.game),
+      logoUrl: model.logoUrl,
+      status: _tourStatusFromModel(model),
+      prize: model.prizePoolDisplay,
+      type: model.type,
+      format: _tourFormatFromModel(model.format),
+      startDate: model.startDate?.toIso8601String().split('T').first,
+      endDate: model.endDate?.toIso8601String().split('T').first,
+      regDeadline:
+          model.registrationDeadline?.toIso8601String().split('T').first,
+      description: model.description,
+      requirements: model.requirements,
+      organizer: model.organizer,
+      location: model.location,
+      maxTeams: model.maxTeams,
+      isArchived: model.isArchived,
+      registrants: registrants,
+      schedules: schedules,
+      bracketRounds: bracketRounds,
+      standings: standings,
+    );
+  }
+
+  static TournamentModel _modelFromTournament(
+    Tournament tournament, {
+    TournamentModel? previous,
+  }) {
+    final previousTeams = {
+      for (final team in previous?.teams ?? <TeamModel>[]) team.id: team
+    };
+    final teams = tournament.registrants.map((registration) {
+      final existing = previousTeams[registration.id];
+      final players = existing?.players ??
+          registration.roster
+              .map(
+                (name) => PlayerModel(
+                  id: '${registration.id}_${name.hashCode}',
+                  ign: name,
+                  type: PlayerType.main,
+                  game: _gameTitleFromCtx(tournament.game),
+                ),
+              )
+              .toList();
+      return (existing ??
+              TeamModel(
+                id: registration.id,
+                name: registration.teamName,
+                game: _gameTitleFromCtx(tournament.game),
+              ))
+          .copyWith(
+        name: registration.teamName,
+        country: registration.region,
+        players: players,
+        description: registration.note,
+        managerName: registration.manager,
+        founderName: registration.manager,
+        coachName: registration.coach,
+        assistantCoachName: registration.assistantCoach,
+        status: _teamStatusFromApproval(registration.state),
+      );
+    }).toList();
+
+    final teamByName = {for (final team in teams) team.name: team.id};
+    final matches = <MatchModel>[];
+    for (final schedule in tournament.schedules) {
+      matches.add(
+        MatchModel(
+          id: schedule.id,
+          tournamentId: tournament.id,
+          team1Id: teamByName[schedule.teamA] ?? schedule.teamA,
+          team2Id: teamByName[schedule.teamB] ?? schedule.teamB,
+          round: schedule.round,
+          status: 'upcoming',
+          scheduledAt:
+              '${schedule.date}${schedule.time.isNotEmpty ? ' • ${schedule.time}' : ''}',
+        ),
+      );
+    }
+    for (final round in tournament.bracketRounds) {
+      for (final match in round.matches) {
+        matches.removeWhere((entry) => entry.id == match.id);
+        matches.add(
+          MatchModel(
+            id: match.id,
+            tournamentId: tournament.id,
+            team1Id: teamByName[match.teamA] ?? match.teamA,
+            team2Id: teamByName[match.teamB] ?? match.teamB,
+            score1: match.scoreA,
+            score2: match.scoreB,
+            round: round.roundName,
+            status: match.isFinalized ? 'completed' : 'upcoming',
+            winnerId: teamByName[match.winner ?? ''],
+            scheduledAt:
+                '${match.date ?? ''}${match.time?.isNotEmpty == true ? ' • ${match.time}' : ''}'
+                    .trim(),
+          ),
+        );
+      }
+    }
+
+    final standings = tournament.standings
+        .map(
+          (standing) => StandingModel(
+            teamId: teamByName[standing.teamName] ?? standing.id,
+            teamName: standing.teamName,
+            played: standing.played,
+            wins: standing.wins,
+            losses: standing.losses,
+            points: standing.points,
+          ),
+        )
+        .toList();
+
+    return (previous ??
+            TournamentModel(
+              id: tournament.id,
+              title: tournament.title,
+              game: _gameTitleFromCtx(tournament.game),
+              status: _modelStatusFromTour(tournament.status),
+            ))
+        .copyWith(
+      title: tournament.title,
+      game: _gameTitleFromCtx(tournament.game),
+      status: _modelStatusFromTour(tournament.status),
+      format: _modelFormatFromTour(tournament.format),
+      description: tournament.description,
+      prizePool: _parsePrize(tournament.prize),
+      maxTeams: tournament.maxTeams,
+      registeredTeams: teams.length,
+      matches: matches,
+      teams: teams,
+      standings: standings,
+      startDate: _parseDate(tournament.startDate),
+      endDate: _parseDate(tournament.endDate),
+      organizer: tournament.organizer,
+      location: tournament.location,
+      registrationDeadline: _parseDate(tournament.regDeadline),
+      logoUrl: tournament.logoUrl,
+      type: tournament.type,
+      requirements: tournament.requirements,
+      isArchived: tournament.isArchived,
+    );
+  }
+
+  static String? _firstPlayerName(TeamModel team, PlayerType type) {
+    final player =
+        team.players.where((entry) => entry.type == type).firstOrNull;
+    return player?.fullName ?? player?.ign;
+  }
+
+  static String _teamNameForId(TournamentModel tournament, String? teamId) {
+    if (teamId == null || teamId.isEmpty) return 'TBD';
+    return tournament.teams
+            .where((team) => team.id == teamId)
+            .firstOrNull
+            ?.name ??
+        teamId;
+  }
+
+  static DateTime? _parseDate(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    return DateTime.tryParse(value.trim());
+  }
+
+  static int? _parsePrize(String prize) {
+    final digits = prize.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return null;
+    return int.tryParse(digits);
+  }
+
+  static String _datePart(String? value) {
+    if (value == null || value.isEmpty) return '';
+    return value.split('•').first.trim();
+  }
+
+  static String _timePart(String? value) {
+    if (value == null || !value.contains('•')) return '';
+    return value.split('•').last.trim();
+  }
+
+  static ApprovalState _approvalFromTeamStatus(TeamStatus status) {
+    switch (status) {
+      case TeamStatus.approved:
+        return ApprovalState.approved;
+      case TeamStatus.rejected:
+        return ApprovalState.rejected;
+      case TeamStatus.pending:
+        return ApprovalState.pending;
+    }
+  }
+
+  static TeamStatus _teamStatusFromApproval(ApprovalState state) {
+    switch (state) {
+      case ApprovalState.approved:
+        return TeamStatus.approved;
+      case ApprovalState.rejected:
+        return TeamStatus.rejected;
+      case ApprovalState.pending:
+        return TeamStatus.pending;
+    }
+  }
+
+  static TourStatus _tourStatusFromModel(TournamentModel model) {
+    if (model.isArchived) return TourStatus.closed;
+    switch (model.status) {
+      case TournamentStatus.ongoing:
+        return TourStatus.live;
+      case TournamentStatus.registration:
+        return TourStatus.open;
+      case TournamentStatus.upcoming:
+        return TourStatus.upcoming;
+      case TournamentStatus.ended:
+        return TourStatus.closed;
+    }
+  }
+
+  static TournamentStatus _modelStatusFromTour(TourStatus status) {
+    switch (status) {
+      case TourStatus.live:
+        return TournamentStatus.ongoing;
+      case TourStatus.open:
+        return TournamentStatus.registration;
+      case TourStatus.upcoming:
+        return TournamentStatus.upcoming;
+      case TourStatus.closed:
+        return TournamentStatus.ended;
+    }
+  }
+
+  static TourFormat _tourFormatFromModel(TournamentFormat format) {
+    switch (format) {
+      case TournamentFormat.singleElim:
+        return TourFormat.singleElim;
+      case TournamentFormat.doubleElim:
+        return TourFormat.doubleElim;
+      case TournamentFormat.groupStage:
+        return TourFormat.groupStage;
+      case TournamentFormat.groupAndElim:
+        return TourFormat.groupAndElim;
+      case TournamentFormat.roundRobin:
+        return TourFormat.roundRobin;
+    }
+  }
+
+  static TournamentFormat _modelFormatFromTour(TourFormat format) {
+    switch (format) {
+      case TourFormat.singleElim:
+        return TournamentFormat.singleElim;
+      case TourFormat.doubleElim:
+        return TournamentFormat.doubleElim;
+      case TourFormat.groupStage:
+        return TournamentFormat.groupStage;
+      case TourFormat.groupAndElim:
+        return TournamentFormat.groupAndElim;
+      case TourFormat.roundRobin:
+        return TournamentFormat.roundRobin;
+    }
+  }
+
+  static GameCtx _gameCtxFromTitle(GameTitle game) {
+    switch (game) {
+      case GameTitle.mlbb:
+        return GameCtx.mlbb;
+      case GameTitle.pubg:
+        return GameCtx.pubg;
+      case GameTitle.freeFire:
+        return GameCtx.freeFire;
+      case GameTitle.valorant:
+        return GameCtx.valorant;
+      case GameTitle.cod:
+        return GameCtx.cod;
+      case GameTitle.eFootball:
+        return GameCtx.eFootball;
+      case GameTitle.other:
+        return GameCtx.other;
+    }
+  }
+
+  static GameTitle _gameTitleFromCtx(GameCtx game) {
+    switch (game) {
+      case GameCtx.mlbb:
+        return GameTitle.mlbb;
+      case GameCtx.pubg:
+        return GameTitle.pubg;
+      case GameCtx.freeFire:
+        return GameTitle.freeFire;
+      case GameCtx.valorant:
+        return GameTitle.valorant;
+      case GameCtx.cod:
+        return GameTitle.cod;
+      case GameCtx.eFootball:
+        return GameTitle.eFootball;
+      case GameCtx.other:
+        return GameTitle.other;
+    }
+  }
+
+  static UserRole _roleFromLabel(String role) {
+    final lower = role.toLowerCase();
+    if (lower.contains('admin')) return UserRole.admin;
+    if (lower.contains('organizer') || lower.contains('manager')) {
+      return UserRole.organizer;
+    }
+    return UserRole.user;
+  }
 }
 
 Color approvalColor(ApprovalState state) => switch (state) {

@@ -16,6 +16,14 @@ class _AdminApprovalsViewState extends State<AdminApprovalsView> {
   Tournament? _selectedTournament;
 
   @override
+  void initState() {
+    super.initState();
+    DB.initialize().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -566,8 +574,13 @@ class _TeamReviewListState extends State<_TeamReviewList>
                           label: 'Reject',
                           color: AC.red,
                           icon: Icons.close_rounded,
-                          onTap: () {
+                          onTap: () async {
                             setState(() => team.state = ApprovalState.rejected);
+                            await DB.updateTeamApproval(
+                              tournamentId: widget.tournament.id,
+                              teamId: team.id,
+                              state: ApprovalState.rejected,
+                            );
                             widget.onChanged();
                           },
                         ),
@@ -577,8 +590,13 @@ class _TeamReviewListState extends State<_TeamReviewList>
                         child: GradButton(
                           label: 'Approve',
                           icon: Icons.check_rounded,
-                          onTap: () {
+                          onTap: () async {
                             setState(() => team.state = ApprovalState.approved);
+                            await DB.updateTeamApproval(
+                              tournamentId: widget.tournament.id,
+                              teamId: team.id,
+                              state: ApprovalState.approved,
+                            );
                             widget.onChanged();
                           },
                         ),
@@ -589,8 +607,13 @@ class _TeamReviewListState extends State<_TeamReviewList>
                           label: 'Undo Action',
                           color: AC.textSecondary,
                           icon: Icons.undo_rounded,
-                          onTap: () {
+                          onTap: () async {
                             setState(() => team.state = ApprovalState.pending);
+                            await DB.updateTeamApproval(
+                              tournamentId: widget.tournament.id,
+                              teamId: team.id,
+                              state: ApprovalState.pending,
+                            );
                             widget.onChanged();
                           },
                         ),
@@ -958,9 +981,16 @@ class _AdminApprovalTeamDetailScreenState
                       label: 'Reject',
                       color: AC.red,
                       icon: Icons.close_rounded,
-                      onTap: () => setState(() {
-                        team.state = ApprovalState.rejected;
-                      }),
+                      onTap: () async {
+                        setState(() {
+                          team.state = ApprovalState.rejected;
+                        });
+                        await DB.updateTeamApproval(
+                          tournamentId: widget.tournament.id,
+                          teamId: team.id,
+                          state: ApprovalState.rejected,
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -970,9 +1000,16 @@ class _AdminApprovalTeamDetailScreenState
                     child: GradButton(
                       label: 'Approve',
                       icon: Icons.check_rounded,
-                      onTap: () => setState(() {
-                        team.state = ApprovalState.approved;
-                      }),
+                      onTap: () async {
+                        setState(() {
+                          team.state = ApprovalState.approved;
+                        });
+                        await DB.updateTeamApproval(
+                          tournamentId: widget.tournament.id,
+                          teamId: team.id,
+                          state: ApprovalState.approved,
+                        );
+                      },
                     ),
                   )
                 else
@@ -981,9 +1018,16 @@ class _AdminApprovalTeamDetailScreenState
                       label: 'Undo to Pending',
                       color: AC.textSecondary,
                       icon: Icons.undo_rounded,
-                      onTap: () => setState(() {
-                        team.state = ApprovalState.pending;
-                      }),
+                      onTap: () async {
+                        setState(() {
+                          team.state = ApprovalState.pending;
+                        });
+                        await DB.updateTeamApproval(
+                          tournamentId: widget.tournament.id,
+                          teamId: team.id,
+                          state: ApprovalState.pending,
+                        );
+                      },
                     ),
                   ),
               ],
@@ -994,9 +1038,16 @@ class _AdminApprovalTeamDetailScreenState
                 label: 'Undo to Pending',
                 color: AC.textSecondary,
                 icon: Icons.undo_rounded,
-                onTap: () => setState(() {
-                  team.state = ApprovalState.pending;
-                }),
+                onTap: () async {
+                  setState(() {
+                    team.state = ApprovalState.pending;
+                  });
+                  await DB.updateTeamApproval(
+                    tournamentId: widget.tournament.id,
+                    teamId: team.id,
+                    state: ApprovalState.pending,
+                  );
+                },
               ),
             ],
           ],
