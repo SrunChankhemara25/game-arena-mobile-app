@@ -30,6 +30,9 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        // BouncingScrollPhysics gives smooth iOS-style overscroll
+        // without any layout expansion on scroll
+        physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

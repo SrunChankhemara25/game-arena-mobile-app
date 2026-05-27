@@ -30,7 +30,27 @@ class _AdminApprovalsViewState extends State<AdminApprovalsView> {
         ),
         Expanded(
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
+            duration: const Duration(milliseconds: 280),
+            transitionBuilder: (child, animation) {
+              // Slide from right on forward, slide from left on back
+              final offsetTween = Tween<Offset>(
+                begin: const Offset(0.06, 0),
+                end: Offset.zero,
+              );
+              return FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOut,
+                ),
+                child: SlideTransition(
+                  position: offsetTween.animate(
+                    CurvedAnimation(
+                        parent: animation, curve: Curves.easeOutCubic),
+                  ),
+                  child: child,
+                ),
+              );
+            },
             child: _selectedGame == null
                 ? _GameSelection(
                     key: const ValueKey('games'),
@@ -66,6 +86,7 @@ class _AdminApprovalsViewState extends State<AdminApprovalsView> {
   }
 }
 
+// ─── Breadcrumb ───────────────────────────────────────────────────────────────
 class _ApprovalBreadcrumb extends StatelessWidget {
   final GameCtx? game;
   final Tournament? tournament;
@@ -158,7 +179,8 @@ class _Crumb extends StatelessWidget {
   }
 }
 
-class _GameSelection extends StatelessWidget {
+// ─── Game Selection ───────────────────────────────────────────────────────────
+class _GameSelection extends StatefulWidget {
   final ValueChanged<GameCtx> onSelect;
 
   const _GameSelection({
@@ -167,12 +189,37 @@ class _GameSelection extends StatelessWidget {
   });
 
   @override
+  State<_GameSelection> createState() => _GameSelectionState();
+}
+
+class _GameSelectionState extends State<_GameSelection>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final games = GameCtx.values;
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: GameCtx.values.length,
+      physics: const BouncingScrollPhysics(),
+      itemCount: games.length,
       itemBuilder: (context, index) {
-        final game = GameCtx.values[index];
+        final game = games[index];
         final tournaments = DB.tournaments
             .where((tournament) => tournament.game == game)
             .toList();
@@ -181,22 +228,148 @@ class _GameSelection extends StatelessWidget {
           (count, tournament) => count + tournament.pendingCount,
         );
 
-        return GestureDetector(
-          onTap: tournaments.isEmpty ? null : () => onSelect(game),
-          child: Opacity(
-            opacity: tournaments.isEmpty ? 0.55 : 1,
+        final delay = (index * 0.07).clamp(0.0, 0.7);
+        final itemAnim = CurvedAnimation(
+          parent: _ctrl,
+          curve: Interval(delay, 1.0, curve: Curves.easeOutCubic),
+        );
+
+        return AnimatedBuilder(
+          animation: itemAnim,
+          builder: (_, child) => Transform.translate(
+            offset: Offset(0, 28 * (1 - itemAnim.value)),
+            child: Opacity(opacity: itemAnim.value, child: child),
+          ),
+          child: GestureDetector(
+            onTap: tournaments.isEmpty ? null : () => widget.onSelect(game),
+            child: Opacity(
+              opacity: tournaments.isEmpty ? 0.55 : 1,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: cardDecor(
+                  border: tournaments.isEmpty
+                      ? AC.border
+                      : AC.pink.withOpacity(0.16),
+                ),
+                child: Row(
+                  children: [
+                    AdminLogoBadge(
+                      imageUrl: defaultGameLogoUrl(game),
+                      fallback: game.label,
+                      size: 46,
+                      radius: 14,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(game.label, style: AT.subheading),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${tournaments.length} tournaments • $pending pending approvals',
+                            style: AT.caption,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (pending > 0)
+                      StatusBadge(label: '$pending', color: AC.gold),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chevron_right_rounded,
+                        color: AC.textMuted, size: 18),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Tournament Selection ─────────────────────────────────────────────────────
+class _TournamentSelection extends StatefulWidget {
+  final GameCtx game;
+  final ValueChanged<Tournament> onSelect;
+
+  const _TournamentSelection({
+    super.key,
+    required this.game,
+    required this.onSelect,
+  });
+
+  @override
+  State<_TournamentSelection> createState() => _TournamentSelectionState();
+}
+
+class _TournamentSelectionState extends State<_TournamentSelection>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tournaments = DB.tournaments
+        .where((tournament) => tournament.game == widget.game)
+        .toList();
+
+    if (tournaments.isEmpty) {
+      return const EmptyState(
+        icon: Icons.inbox_outlined,
+        title: 'No tournaments',
+        subtitle: 'There are no tournaments registered for this game yet.',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      physics: const BouncingScrollPhysics(),
+      itemCount: tournaments.length,
+      itemBuilder: (context, index) {
+        final tournament = tournaments[index];
+
+        final delay = (index * 0.07).clamp(0.0, 0.7);
+        final itemAnim = CurvedAnimation(
+          parent: _ctrl,
+          curve: Interval(delay, 1.0, curve: Curves.easeOutCubic),
+        );
+
+        return AnimatedBuilder(
+          animation: itemAnim,
+          builder: (_, child) => Transform.translate(
+            offset: Offset(0, 28 * (1 - itemAnim.value)),
+            child: Opacity(opacity: itemAnim.value, child: child),
+          ),
+          child: GestureDetector(
+            onTap: () => widget.onSelect(tournament),
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(14),
               decoration: cardDecor(
-                border:
-                    tournaments.isEmpty ? AC.border : AC.pink.withOpacity(0.16),
+                border: tourStatusColor(tournament.status).withOpacity(0.18),
               ),
               child: Row(
                 children: [
                   AdminLogoBadge(
-                    imageUrl: defaultGameLogoUrl(game),
-                    fallback: game.label,
+                    imageUrl: tournament.resolvedLogoUrl,
+                    fallback: tournament.game.label,
                     size: 46,
                     radius: 14,
                   ),
@@ -205,18 +378,36 @@ class _GameSelection extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(game.label, style: AT.subheading),
+                        Text(
+                          tournament.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AT.subheading,
+                        ),
                         const SizedBox(height: 4),
                         Text(
-                          '${tournaments.length} tournaments • $pending pending approvals',
+                          '${tournament.registrants.length} teams • ${tournament.prize}',
                           style: AT.caption,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            StatusBadge(
+                              label: tournament.status.label,
+                              color: tourStatusColor(tournament.status),
+                            ),
+                            if (tournament.pendingCount > 0)
+                              StatusBadge(
+                                label: '${tournament.pendingCount} pending',
+                                color: AC.gold,
+                              ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  if (pending > 0)
-                    StatusBadge(label: '$pending', color: AC.gold),
-                  const SizedBox(width: 8),
                   const Icon(Icons.chevron_right_rounded,
                       color: AC.textMuted, size: 18),
                 ],
@@ -229,97 +420,8 @@ class _GameSelection extends StatelessWidget {
   }
 }
 
-class _TournamentSelection extends StatelessWidget {
-  final GameCtx game;
-  final ValueChanged<Tournament> onSelect;
-
-  const _TournamentSelection({
-    super.key,
-    required this.game,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tournaments =
-        DB.tournaments.where((tournament) => tournament.game == game).toList();
-
-    if (tournaments.isEmpty) {
-      return const EmptyState(
-        icon: Icons.inbox_outlined,
-        title: 'No tournaments',
-        subtitle: 'There are no tournaments registered for this game yet.',
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: tournaments.length,
-      itemBuilder: (context, index) {
-        final tournament = tournaments[index];
-        return GestureDetector(
-          onTap: () => onSelect(tournament),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
-            decoration: cardDecor(
-              border: tourStatusColor(tournament.status).withOpacity(0.18),
-            ),
-            child: Row(
-              children: [
-                AdminLogoBadge(
-                  imageUrl: tournament.resolvedLogoUrl,
-                  fallback: tournament.game.label,
-                  size: 46,
-                  radius: 14,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tournament.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AT.subheading,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${tournament.registrants.length} teams • ${tournament.prize}',
-                        style: AT.caption,
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          StatusBadge(
-                            label: tournament.status.label,
-                            color: tourStatusColor(tournament.status),
-                          ),
-                          if (tournament.pendingCount > 0)
-                            StatusBadge(
-                              label: '${tournament.pendingCount} pending',
-                              color: AC.gold,
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AC.textMuted, size: 18),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _TeamReviewList extends StatelessWidget {
+// ─── Team Review List ─────────────────────────────────────────────────────────
+class _TeamReviewList extends StatefulWidget {
   final Tournament tournament;
   final VoidCallback onChanged;
   final ValueChanged<TeamReg> onOpenDetail;
@@ -332,8 +434,32 @@ class _TeamReviewList extends StatelessWidget {
   });
 
   @override
+  State<_TeamReviewList> createState() => _TeamReviewListState();
+}
+
+class _TeamReviewListState extends State<_TeamReviewList>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final teams = tournament.registrants;
+    final teams = widget.tournament.registrants;
+
     if (teams.isEmpty) {
       return const EmptyState(
         icon: Icons.groups_outlined,
@@ -344,111 +470,135 @@ class _TeamReviewList extends StatelessWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.all(20),
+      physics: const BouncingScrollPhysics(),
       itemCount: teams.length,
       itemBuilder: (context, index) {
         final team = teams[index];
         final tone = approvalColor(team.state);
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: cardDecor(border: tone.withOpacity(0.18)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                onTap: () => onOpenDetail(team),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: tone.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Center(
-                        child: Text(
-                          team.teamName.isEmpty
-                              ? '?'
-                              : team.teamName[0].toUpperCase(),
-                          style: TextStyle(
-                            color: tone,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
+        final delay = (index * 0.07).clamp(0.0, 0.7);
+        final itemAnim = CurvedAnimation(
+          parent: _ctrl,
+          curve: Interval(delay, 1.0, curve: Curves.easeOutCubic),
+        );
+
+        return AnimatedBuilder(
+          animation: itemAnim,
+          builder: (_, child) => Transform.translate(
+            offset: Offset(0, 28 * (1 - itemAnim.value)),
+            child: Opacity(opacity: itemAnim.value, child: child),
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: cardDecor(border: tone.withOpacity(0.18)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () => widget.onOpenDetail(team),
+                  child: Row(
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: tone.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Center(
+                          child: Text(
+                            team.teamName.isEmpty
+                                ? '?'
+                                : team.teamName[0].toUpperCase(),
+                            style: TextStyle(
+                              color: tone,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(team.teamName, style: AT.subheading),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${team.region} • ${team.lineupCount} players',
-                            style: AT.caption,
-                          ),
-                        ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(team.teamName, style: AT.subheading),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${team.region} • ${team.lineupCount} players',
+                              style: AT.caption,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    StatusBadge(label: team.state.label, color: tone),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              _CompactApprovalLineup(team: team),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlineBtn(
-                      label: 'Details',
-                      icon: Icons.visibility_rounded,
-                      onTap: () => onOpenDetail(team),
-                    ),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        child: StatusBadge(
+                          key: ValueKey(team.state),
+                          label: team.state.label,
+                          color: tone,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  if (team.state == ApprovalState.pending) ...[
+                ),
+                const SizedBox(height: 12),
+                _CompactApprovalLineup(team: team),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
                     Expanded(
                       child: OutlineBtn(
-                        label: 'Reject',
-                        color: AC.red,
-                        icon: Icons.close_rounded,
-                        onTap: () {
-                          team.state = ApprovalState.rejected;
-                          onChanged();
-                        },
+                        label: 'Details',
+                        icon: Icons.visibility_rounded,
+                        onTap: () => widget.onOpenDetail(team),
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: GradButton(
-                        label: 'Approve',
-                        icon: Icons.check_rounded,
-                        onTap: () {
-                          team.state = ApprovalState.approved;
-                          onChanged();
-                        },
+                    if (team.state == ApprovalState.pending) ...[
+                      Expanded(
+                        child: OutlineBtn(
+                          label: 'Reject',
+                          color: AC.red,
+                          icon: Icons.close_rounded,
+                          onTap: () {
+                            setState(() => team.state = ApprovalState.rejected);
+                            widget.onChanged();
+                          },
+                        ),
                       ),
-                    ),
-                  ] else
-                    Expanded(
-                      child: OutlineBtn(
-                        label: 'Undo Action',
-                        color: AC.textSecondary,
-                        icon: Icons.undo_rounded,
-                        onTap: () {
-                          team.state = ApprovalState.pending;
-                          onChanged();
-                        },
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GradButton(
+                          label: 'Approve',
+                          icon: Icons.check_rounded,
+                          onTap: () {
+                            setState(() => team.state = ApprovalState.approved);
+                            widget.onChanged();
+                          },
+                        ),
                       ),
-                    ),
-                ],
-              ),
-            ],
+                    ] else
+                      Expanded(
+                        child: OutlineBtn(
+                          label: 'Undo Action',
+                          color: AC.textSecondary,
+                          icon: Icons.undo_rounded,
+                          onTap: () {
+                            setState(() => team.state = ApprovalState.pending);
+                            widget.onChanged();
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -456,6 +606,7 @@ class _TeamReviewList extends StatelessWidget {
   }
 }
 
+// ─── Compact Approval Lineup ──────────────────────────────────────────────────
 class _CompactApprovalLineup extends StatelessWidget {
   final TeamReg team;
 
@@ -512,6 +663,7 @@ class _CompactApprovalLineup extends StatelessWidget {
   }
 }
 
+// ─── Lineup Identity Board ────────────────────────────────────────────────────
 class _LineupIdentityBoard extends StatelessWidget {
   final TeamReg team;
 
@@ -665,6 +817,7 @@ class _StaffTile extends StatelessWidget {
   }
 }
 
+// ─── Team Detail Screen ───────────────────────────────────────────────────────
 class AdminApprovalTeamDetailScreen extends StatefulWidget {
   final Tournament tournament;
   final TeamReg team;
@@ -696,6 +849,7 @@ class _AdminApprovalTeamDetailScreenState
         leading: const BackButton(color: AC.cyan),
       ),
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -714,7 +868,8 @@ class _AdminApprovalTeamDetailScreenState
                 children: [
                   Row(
                     children: [
-                      Container(
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
@@ -757,7 +912,14 @@ class _AdminApprovalTeamDetailScreenState
                     spacing: 10,
                     runSpacing: 10,
                     children: [
-                      StatusBadge(label: team.state.label, color: tone),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        child: StatusBadge(
+                          key: ValueKey(team.state),
+                          label: team.state.label,
+                          color: tone,
+                        ),
+                      ),
                       StatusBadge(
                         label: '${team.lineupCount} players',
                         color: AC.cyan,

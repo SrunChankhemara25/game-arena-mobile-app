@@ -13,7 +13,12 @@ import '../auth/login_screen.dart';
 // ─── Profile Screen ───────────────────────────────────────────────────────────
 class ProfileScreen extends StatefulWidget {
   final bool isAdmin;
-  const ProfileScreen({super.key, this.isAdmin = false});
+  final bool scrollToAlerts; // ← NEW
+  const ProfileScreen({
+    super.key,
+    this.isAdmin = false,
+    this.scrollToAlerts = false, // ← NEW
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -23,6 +28,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     with TickerProviderStateMixin {
   late final AnimationController _entranceCtrl;
   late final AnimationController _pulseCtrl;
+
+  final ScrollController _scrollController = ScrollController(); // ← NEW
+  final GlobalKey _alertsSectionKey = GlobalKey(); // ← NEW
 
   // Mutable alerts state to handle read, archive, unarchive, and deletion live
   late List<Map<String, dynamic>> _alerts;
@@ -92,13 +100,31 @@ class _ProfileScreenState extends State<ProfileScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2400),
     )..repeat(reverse: true);
+
+    // ← NEW: scroll to alerts after first frame if requested
+    if (widget.scrollToAlerts) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToAlerts());
+    }
   }
 
   @override
   void dispose() {
     _entranceCtrl.dispose();
     _pulseCtrl.dispose();
+    _scrollController.dispose(); // ← NEW
     super.dispose();
+  }
+
+  // ← NEW: scroll to the alerts section
+  void _scrollToAlerts() {
+    final ctx = _alertsSectionKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   // Helper logic to view notification details
@@ -249,6 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
           // ── Main content (Edge-to-Edge scrolling) ───────────────────
           CustomScrollView(
+            controller: _scrollController, // ← NEW
             physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics(),
             ),
@@ -276,9 +303,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
               ),
 
-              // Section: Active Alerts
+              // Section: Active Alerts ← key added here
               SliverToBoxAdapter(
                 child: _SectionLabel(
+                  key: _alertsSectionKey, // ← NEW
                   label: 'ALERTS',
                   tag: activeAlerts.length.toString(),
                   tagColor: AppColors.cyan,
@@ -372,12 +400,31 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildTopBar(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
+    final canPop = Navigator.canPop(context);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(24, topPad + 16, 20, 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          if (canPop)
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                Navigator.pop(context);
+              },
+              child: Container(
+                margin: const EdgeInsets.only(right: 12),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.bg1,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: AppColors.textSecondary, size: 18),
+              ),
+            ),
           Container(
             width: 4,
             height: 28,
@@ -403,7 +450,9 @@ class _ProfileScreenState extends State<ProfileScreen>
               HapticFeedback.lightImpact();
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => SettingsScreen(user: _user)),
+                MaterialPageRoute(
+                  builder: (_) => SettingsScreen(user: _user),
+                ),
               );
             },
           ),
@@ -1393,6 +1442,7 @@ class _SectionLabel extends StatelessWidget {
   final double delay;
 
   const _SectionLabel({
+    super.key, // ← accepts key from parent (used by _alertsSectionKey)
     required this.label,
     this.tag,
     this.tagColor,

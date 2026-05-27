@@ -1004,6 +1004,9 @@ class _BracketTab extends StatelessWidget {
     'Grand Final',
   ];
 
+  TeamModel? _findTeam(String? id) =>
+      id == null ? null : tournament.teams.where((t) => t.id == id).firstOrNull;
+
   @override
   Widget build(BuildContext context) {
     if (tournament.matches.isEmpty) {
@@ -1013,92 +1016,106 @@ class _BracketTab extends StatelessWidget {
           subtitle: 'The bracket will be generated after registration closes');
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
+    // Build list of round sections
+    final roundSections = _rounds.map((round) {
+      final matches = tournament.matches
+          .where((m) =>
+              m.round.startsWith(round.split(' - ').first) || m.round == round)
+          .toList();
+      return (round: round, matches: matches);
+    }).toList();
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+      itemCount: roundSections.length,
+      itemBuilder: (context, roundIndex) {
+        final section = roundSections[roundIndex];
+        final matches = section.matches;
+
+        // Build pairs for 2-column grid
+        final rows = <List<MatchModel?>>[];
+        if (matches.isEmpty) {
+          rows.add([null, null]); // dummy row
+        } else {
+          for (int i = 0; i < matches.length; i += 2) {
+            rows.add([
+              matches[i],
+              i + 1 < matches.length ? matches[i + 1] : null,
+            ]);
+          }
+        }
+
+        return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: _rounds.asMap().entries.map((e) {
-            final roundMatches = tournament.matches
-                .where((m) =>
-                    m.round.startsWith(e.value.split(' - ').first) ||
-                    m.round == e.value)
-                .toList();
-            return _BracketColumn(
-              round: e.value,
-              matches: roundMatches,
-              tournament: tournament,
-              isLast: e.key == _rounds.length - 1,
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _BracketColumn extends StatelessWidget {
-  final String round;
-  final List<MatchModel> matches;
-  final TournamentModel tournament;
-  final bool isLast;
-  const _BracketColumn(
-      {required this.round,
-      required this.matches,
-      required this.tournament,
-      required this.isLast});
-
-  TeamModel? _findTeam(String? id) =>
-      id == null ? null : tournament.teams.where((t) => t.id == id).firstOrNull;
-
-  @override
-  Widget build(BuildContext context) => Row(children: [
-        Column(children: [
-          Container(
-            width: 168,
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.purple.withValues(alpha: 0.2),
-                  AppColors.cyan.withValues(alpha: 0.1),
-                ],
+          children: [
+            // Round header
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.purple.withValues(alpha: 0.2),
+                    AppColors.cyan.withValues(alpha: 0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(8),
+                border:
+                    Border.all(color: AppColors.purple.withValues(alpha: 0.35)),
               ),
-              borderRadius: BorderRadius.circular(8),
-              border:
-                  Border.all(color: AppColors.purple.withValues(alpha: 0.35)),
+              child: Row(children: [
+                const Icon(AppIcons.format, size: 13, color: AppColors.cyan),
+                const SizedBox(width: 8),
+                Text(section.round,
+                    style: AppText.label.copyWith(
+                        color: AppColors.cyan, fontSize: 10, letterSpacing: 1)),
+              ]),
             ),
-            child: Text(round,
-                style: AppText.label.copyWith(
-                    color: AppColors.cyan, fontSize: 10, letterSpacing: 1),
-                textAlign: TextAlign.center,
-                maxLines: 2),
-          ),
-          if (matches.isEmpty)
-            _BracketMatchCard(
-                match: null, team1: null, team2: null, isDummy: true)
-          else
-            ...matches.map((m) => Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _BracketMatchCard(
-                    match: m,
-                    team1: _findTeam(m.team1Id),
-                    team2: _findTeam(m.team2Id),
+
+            // 2-column match grid — vertical only
+            ...rows.map((pair) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Left card
+                      Expanded(
+                        child: pair[0] == null
+                            ? _BracketMatchCard(
+                                match: null,
+                                team1: null,
+                                team2: null,
+                                isDummy: matches.isEmpty,
+                              )
+                            : _BracketMatchCard(
+                                match: pair[0],
+                                team1: _findTeam(pair[0]!.team1Id),
+                                team2: _findTeam(pair[0]!.team2Id),
+                              ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Right card (or empty space)
+                      Expanded(
+                        child: pair[1] == null
+                            ? const SizedBox.shrink()
+                            : _BracketMatchCard(
+                                match: pair[1],
+                                team1: _findTeam(pair[1]!.team1Id),
+                                team2: _findTeam(pair[1]!.team2Id),
+                              ),
+                      ),
+                    ],
                   ),
                 )),
-        ]),
-        if (!isLast)
-          const SizedBox(
-            width: 32,
-            height: 80,
-            child: Center(
-              child: Icon(AppIcons.chevronRight,
-                  size: 18, color: AppColors.border),
-            ),
-          ),
-      ]);
+
+            // Space between rounds
+            const SizedBox(height: 20),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _BracketMatchCard extends StatelessWidget {
@@ -1117,7 +1134,6 @@ class _BracketMatchCard extends StatelessWidget {
     final isDone = match?.status == 'completed';
 
     return Container(
-      width: 168,
       decoration: BoxDecoration(
         color: isDone ? AppColors.green.withValues(alpha: 0.04) : AppColors.bg2,
         borderRadius: BorderRadius.circular(10),

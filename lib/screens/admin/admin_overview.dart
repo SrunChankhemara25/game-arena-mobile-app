@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core_shared.dart';
 
-class AdminOverviewView extends StatelessWidget {
+class AdminOverviewView extends StatefulWidget {
   final ValueChanged<int>? onNavigate;
 
   const AdminOverviewView({
@@ -11,16 +11,71 @@ class AdminOverviewView extends StatelessWidget {
   });
 
   @override
+  State<AdminOverviewView> createState() => _AdminOverviewViewState();
+}
+
+class _AdminOverviewViewState extends State<AdminOverviewView>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  final List<Animation<double>> _fadeAnims = [];
+  final List<Animation<Offset>> _slideAnims = [];
+
+  static const int _sectionCount = 12;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+
+    for (int i = 0; i < _sectionCount; i++) {
+      final start = (i * 0.07).clamp(0.0, 0.85);
+      final end = (start + 0.38).clamp(0.0, 1.0);
+      final interval = Interval(start, end, curve: Curves.easeOutCubic);
+
+      _fadeAnims.add(
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(parent: _controller, curve: interval),
+        ),
+      );
+      _slideAnims.add(
+        Tween<Offset>(
+          begin: const Offset(0, 0.28),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(parent: _controller, curve: interval),
+        ),
+      );
+    }
+
+    Future.delayed(const Duration(milliseconds: 60), () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Widget _animated(int index, Widget child) {
+    final i = index.clamp(0, _sectionCount - 1);
+    return FadeTransition(
+      opacity: _fadeAnims[i],
+      child: SlideTransition(position: _slideAnims[i], child: child),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final totalTournaments = DB.tournaments.length;
     final liveTournaments = DB.tournaments
         .where((tournament) => tournament.status == TourStatus.live)
         .length;
     final totalUsers = DB.users.length;
-    final pendingApprovals = DB.tournaments
-        .expand((tournament) => tournament.registrants)
-        .where((team) => team.state == ApprovalState.pending)
-        .length;
     final archivedTournaments =
         DB.tournaments.where((tournament) => tournament.isArchived).length;
     final spotlight = DB.tournaments.firstWhere(
@@ -34,79 +89,114 @@ class AdminOverviewView extends StatelessWidget {
         .where((entry) => entry.value.state == ApprovalState.pending)
         .toList();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 24),
-          const SectionHdr(title: 'PLATFORM SNAPSHOT'),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.28,
-            children: [
-              _MetricCard(
-                label: 'Tournaments',
-                value: '$totalTournaments',
-                tone: AC.cyan,
-                icon: Icons.emoji_events_rounded,
-              ),
-              _MetricCard(
-                label: 'Live Now',
-                value: '$liveTournaments',
-                tone: AC.orange,
-                icon: Icons.live_tv_rounded,
-              ),
-              _MetricCard(
-                label: 'Users',
-                value: '$totalUsers',
-                tone: AC.green,
-                icon: Icons.groups_rounded,
-              ),
-              _MetricCard(
-                label: 'Archived',
-                value: '$archivedTournaments',
-                tone: AC.violet,
-                icon: Icons.archive_rounded,
-              ),
-            ],
-          ),
-          const SizedBox(height: 26),
-          const SectionHdr(title: 'TOURNAMENT SPOTLIGHT'),
-          _SpotlightCard(
-            tournament: spotlight,
-            onTap: () => onNavigate?.call(1),
-          ),
-          const SizedBox(height: 26),
-          SectionHdr(
-            title: 'PENDING TEAM REVIEWS',
-            trailing: pendingTeams.isEmpty ? null : 'Open approvals',
-          ),
-          if (pendingTeams.isEmpty)
-            const EmptyState(
-              icon: Icons.task_alt_rounded,
-              title: 'Queue is clear',
-              subtitle: 'There are no pending team approvals right now.',
-            )
-          else
-            ...pendingTeams.take(3).map(
-                  (entry) => _PendingTeamCard(
-                    tournament: entry.key,
-                    team: entry.value,
-                    onTap: () => onNavigate?.call(2),
+    return ScrollConfiguration(
+      behavior: _ClampingScrollBehavior(),
+      child: CustomScrollView(
+        physics: const ClampingScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 44, 20, 28),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _animated(0, const SectionHdr(title: 'PLATFORM SNAPSHOT')),
+                const SizedBox(height: 12),
+                _animated(
+                  1,
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 1.28,
+                    children: [
+                      _MetricCard(
+                        label: 'Tournaments',
+                        value: '$totalTournaments',
+                        tone: AC.cyan,
+                        icon: Icons.emoji_events_rounded,
+                      ),
+                      _MetricCard(
+                        label: 'Live Now',
+                        value: '$liveTournaments',
+                        tone: AC.orange,
+                        icon: Icons.live_tv_rounded,
+                      ),
+                      _MetricCard(
+                        label: 'Users',
+                        value: '$totalUsers',
+                        tone: AC.green,
+                        icon: Icons.groups_rounded,
+                      ),
+                      _MetricCard(
+                        label: 'Archived',
+                        value: '$archivedTournaments',
+                        tone: AC.violet,
+                        icon: Icons.archive_rounded,
+                      ),
+                    ],
                   ),
                 ),
-          const SizedBox(height: 26),
-          const SectionHdr(title: 'RECENT USERS'),
-          ...DB.users.take(3).map((user) => _UserCard(user: user)),
+                const SizedBox(height: 26),
+                _animated(2, const SectionHdr(title: 'TOURNAMENT SPOTLIGHT')),
+                const SizedBox(height: 12),
+                _animated(
+                  3,
+                  _SpotlightCard(
+                    tournament: spotlight,
+                    onTap: () => widget.onNavigate?.call(1),
+                  ),
+                ),
+                const SizedBox(height: 26),
+                _animated(
+                  4,
+                  SectionHdr(
+                    title: 'PENDING TEAM REVIEWS',
+                    trailing: pendingTeams.isEmpty ? null : 'Open approvals',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (pendingTeams.isEmpty)
+                  _animated(
+                    5,
+                    const EmptyState(
+                      icon: Icons.task_alt_rounded,
+                      title: 'Queue is clear',
+                      subtitle:
+                          'There are no pending team approvals right now.',
+                    ),
+                  )
+                else
+                  ...pendingTeams.take(3).toList().asMap().entries.map(
+                        (e) => _animated(
+                          5 + e.key,
+                          _PendingTeamCard(
+                            tournament: e.value.key,
+                            team: e.value.value,
+                            onTap: () => widget.onNavigate?.call(2),
+                          ),
+                        ),
+                      ),
+                const SizedBox(height: 26),
+                _animated(8, const SectionHdr(title: 'RECENT USERS')),
+                const SizedBox(height: 12),
+                ...DB.users.take(3).toList().asMap().entries.map(
+                      (e) => _animated(9 + e.key, _UserCard(user: e.value)),
+                    ),
+              ]),
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+// ── Forces ClampingScrollPhysics on all scrollables, overrides iOS bounce ────
+class _ClampingScrollBehavior extends ScrollBehavior {
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const ClampingScrollPhysics();
 }
 
 class _QuickActionChip extends StatelessWidget {

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'core_shared.dart';
 
+// ── Main Tournaments List Screen ─────────────────────────────────────────────
 class AdminTournamentsView extends StatefulWidget {
   const AdminTournamentsView({super.key});
 
@@ -12,9 +13,11 @@ class AdminTournamentsView extends StatefulWidget {
   State<AdminTournamentsView> createState() => _AdminTournamentsViewState();
 }
 
-class _AdminTournamentsViewState extends State<AdminTournamentsView> {
+class _AdminTournamentsViewState extends State<AdminTournamentsView>
+    with SingleTickerProviderStateMixin {
   bool _showArchived = false;
   final _searchCtrl = TextEditingController();
+  Key _listKey = UniqueKey();
 
   @override
   void dispose() {
@@ -22,113 +25,128 @@ class _AdminTournamentsViewState extends State<AdminTournamentsView> {
     super.dispose();
   }
 
+  void _switchTab(bool archived) {
+    if (_showArchived == archived) return;
+    setState(() {
+      _showArchived = archived;
+      _listKey = UniqueKey();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final tournaments = DB.tournaments.where((tournament) {
-      final matchesArchive = tournament.isArchived == _showArchived;
+    final tournaments = DB.tournaments.where((t) {
+      final matchesArchive = t.isArchived == _showArchived;
       final query = _searchCtrl.text.trim().toLowerCase();
       final matchesQuery = query.isEmpty ||
-          tournament.title.toLowerCase().contains(query) ||
-          tournament.game.label.toLowerCase().contains(query) ||
-          (tournament.organizer ?? '').toLowerCase().contains(query);
+          t.title.toLowerCase().contains(query) ||
+          t.game.label.toLowerCase().contains(query) ||
+          (t.organizer ?? '').toLowerCase().contains(query);
       return matchesArchive && matchesQuery;
     }).toList();
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _searchCtrl,
-                  style: const TextStyle(color: AC.textPrimary),
-                  onChanged: (_) => setState(() {}),
-                  decoration: fieldDecor(
-                    hint: 'Search tournaments by title, game, or organizer',
-                    icon: Icons.search_rounded,
+    return ScrollConfiguration(
+      behavior: _ClampingScrollBehavior(),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Column(
+          children: [
+            // ── Search + Tab header (fixed, does NOT scroll) ──────────────────
+            Container(
+              color: Colors.transparent,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 14),
+                  // Search bar
+                  TextField(
+                    controller: _searchCtrl,
+                    style: const TextStyle(color: AC.textPrimary),
+                    onChanged: (_) => setState(() {}),
+                    decoration: fieldDecor(
+                      hint: 'Search tournaments…',
+                      icon: Icons.search_rounded,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: AC.bg2,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AC.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _ArchiveToggle(
-                          label: 'Active',
-                          isActive: !_showArchived,
-                          onTap: () => setState(() => _showArchived = false),
+                  const SizedBox(height: 12),
+                  // Active / Archived toggle
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AC.bg2,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AC.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _ArchiveToggle(
+                            label: 'Active',
+                            isActive: !_showArchived,
+                            onTap: () => _switchTab(false),
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: _ArchiveToggle(
-                          label: 'Archived',
-                          isActive: _showArchived,
-                          onTap: () => setState(() => _showArchived = true),
+                        Expanded(
+                          child: _ArchiveToggle(
+                            label: 'Archived',
+                            isActive: _showArchived,
+                            onTap: () => _switchTab(true),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: tournaments.isEmpty
-                ? EmptyState(
-                    icon: Icons.emoji_events_outlined,
-                    title: _showArchived
-                        ? 'No archived tournaments'
-                        : 'No tournaments found',
-                    subtitle: _showArchived
-                        ? 'Archived tournaments will appear here.'
-                        : 'Create a new tournament to start managing brackets and lineups.',
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
-                    itemCount: tournaments.length,
-                    itemBuilder: (context, index) {
-                      final tournament = tournaments[index];
-                      return RepaintBoundary(
-                        child: _TournamentListCard(
-                          tournament: tournament,
-                          onOpen: () => _openTournament(tournament),
-                          onEdit: () => _openEditor(existing: tournament),
-                          onArchiveToggle: () {
-                            setState(() {
-                              tournament.isArchived = !tournament.isArchived;
-                            });
-                          },
-                          onDelete: () => _deleteTournament(tournament),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-      floatingActionButton: _showArchived
-          ? null
-          : FloatingActionButton.extended(
-              backgroundColor: AC.cyan,
-              foregroundColor: AC.bg0,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text(
-                'Create',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                ],
               ),
-              onPressed: () => _openEditor(),
             ),
+            // ── Tournament list (scrollable area) ────────────────────────────
+            Expanded(
+              child: tournaments.isEmpty
+                  ? EmptyState(
+                      icon: Icons.emoji_events_outlined,
+                      title: _showArchived
+                          ? 'No archived tournaments'
+                          : 'No tournaments found',
+                      subtitle: _showArchived
+                          ? 'Archived tournaments will appear here.'
+                          : 'Create a new tournament to get started.',
+                    )
+                  : _StaggeredTournamentList(
+                      key: _listKey,
+                      tournaments: tournaments,
+                      onOpen: _openTournament,
+                      onEdit: (t) => _openEditor(existing: t),
+                      onArchiveToggle: (t) =>
+                          setState(() => t.isArchived = !t.isArchived),
+                      onDelete: _deleteTournament,
+                    ),
+            ),
+          ],
+        ),
+        floatingActionButton: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 280),
+          switchInCurve: Curves.easeOutBack,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, anim) => ScaleTransition(
+            scale: anim,
+            child: FadeTransition(opacity: anim, child: child),
+          ),
+          child: _showArchived
+              ? const SizedBox.shrink()
+              : FloatingActionButton.extended(
+                  key: const ValueKey('fab'),
+                  backgroundColor: AC.cyan,
+                  foregroundColor: AC.bg0,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text(
+                    'Create',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  onPressed: () => _openEditor(),
+                ),
+        ),
+      ),
     );
   }
 
@@ -139,10 +157,7 @@ class _AdminTournamentsViewState extends State<AdminTournamentsView> {
         builder: (_) => TournamentEditorScreen(existing: existing),
       ),
     );
-
-    if (saved == true && mounted) {
-      setState(() {});
-    }
+    if (saved == true && mounted) setState(() {});
   }
 
   Future<void> _openTournament(Tournament tournament) async {
@@ -152,10 +167,7 @@ class _AdminTournamentsViewState extends State<AdminTournamentsView> {
         builder: (_) => AdminTournamentDetailScreen(tournament: tournament),
       ),
     );
-
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _deleteTournament(Tournament tournament) async {
@@ -168,12 +180,99 @@ class _AdminTournamentsViewState extends State<AdminTournamentsView> {
       confirmColor: AC.red,
       icon: Icons.delete_outline_rounded,
     );
-
     if (!confirm) return;
     setState(() => DB.tournaments.remove(tournament));
   }
 }
 
+// ── Forces ClampingScrollPhysics on all scrollables, overrides iOS bounce ────
+class _ClampingScrollBehavior extends ScrollBehavior {
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const ClampingScrollPhysics();
+}
+
+// ── Staggered animated list ───────────────────────────────────────────────────
+class _StaggeredTournamentList extends StatefulWidget {
+  final List<Tournament> tournaments;
+  final void Function(Tournament) onOpen;
+  final void Function(Tournament) onEdit;
+  final void Function(Tournament) onArchiveToggle;
+  final void Function(Tournament) onDelete;
+
+  const _StaggeredTournamentList({
+    super.key,
+    required this.tournaments,
+    required this.onOpen,
+    required this.onEdit,
+    required this.onArchiveToggle,
+    required this.onDelete,
+  });
+
+  @override
+  State<_StaggeredTournamentList> createState() =>
+      _StaggeredTournamentListState();
+}
+
+class _StaggeredTournamentListState extends State<_StaggeredTournamentList>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: Duration(
+          milliseconds: 300 + widget.tournaments.length.clamp(0, 10) * 55),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+      itemCount: widget.tournaments.length,
+      itemBuilder: (context, index) {
+        final t = widget.tournaments[index];
+        final stagger = (index * 0.065).clamp(0.0, 0.72);
+        final end = (stagger + 0.38).clamp(0.0, 1.0);
+        final curve = Interval(stagger, end, curve: Curves.easeOutCubic);
+        final fade = Tween<double>(begin: 0.0, end: 1.0)
+            .animate(CurvedAnimation(parent: _ctrl, curve: curve));
+        final slide = Tween<Offset>(
+          begin: const Offset(0, 0.18),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: _ctrl, curve: curve));
+
+        return FadeTransition(
+          opacity: fade,
+          child: SlideTransition(
+            position: slide,
+            child: RepaintBoundary(
+              child: _TournamentListCard(
+                tournament: t,
+                onOpen: () => widget.onOpen(t),
+                onEdit: () => widget.onEdit(t),
+                onArchiveToggle: () => widget.onArchiveToggle(t),
+                onDelete: () => widget.onDelete(t),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Archive toggle chip ───────────────────────────────────────────────────────
 class _ArchiveToggle extends StatelessWidget {
   final String label;
   final bool isActive;
@@ -190,19 +289,23 @@ class _ArchiveToggle extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: Duration.zero,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           gradient: isActive ? AC.gradPrimary : null,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Center(
-          child: Text(
-            label,
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
             style: TextStyle(
               color: isActive ? AC.bg0 : AC.textMuted,
               fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+              fontSize: 14,
             ),
+            child: Text(label),
           ),
         ),
       ),
@@ -210,6 +313,7 @@ class _ArchiveToggle extends StatelessWidget {
   }
 }
 
+// ── Redesigned Tournament List Card ─────────────────────────────────────────
 class _TournamentListCard extends StatelessWidget {
   final Tournament tournament;
   final VoidCallback onOpen;
@@ -227,138 +331,224 @@ class _TournamentListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = tourStatusColor(tournament.status);
     return GestureDetector(
       onTap: onOpen,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: cardDecor(
-          border: tourStatusColor(tournament.status).withOpacity(0.18),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AC.bg2,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: statusColor.withOpacity(0.22)),
         ),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AdminLogoBadge(
-                  imageUrl: tournament.resolvedLogoUrl,
-                  fallback: tournament.game.label,
-                  size: 50,
-                  radius: 14,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Column(
+            children: [
+              // ── Top colour accent bar ──────────────────────────────────
+              Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [statusColor, statusColor.withOpacity(0.3)],
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tournament.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AT.subheading.copyWith(fontSize: 15),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${tournament.game.label} • ${tournament.organizer ?? 'Organizer TBA'}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AT.caption,
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          StatusBadge(
-                            label: tournament.status.label,
-                            color: tourStatusColor(tournament.status),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Identity row ────────────────────────────────────
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Logo / emoji badge
+                        AdminLogoBadge(
+                          imageUrl: tournament.resolvedLogoUrl,
+                          fallback: tournament.game.label,
+                          size: 52,
+                          radius: 14,
+                        ),
+                        const SizedBox(width: 12),
+                        // Title + meta
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tournament.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AC.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                tournament.game.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AT.caption,
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  StatusBadge(
+                                    label: tournament.status.label,
+                                    color: statusColor,
+                                  ),
+                                  if (tournament.pendingCount > 0) ...[
+                                    const SizedBox(width: 6),
+                                    StatusBadge(
+                                      label:
+                                          '${tournament.pendingCount} pending',
+                                      color: AC.gold,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
                           ),
-                          StatusBadge(
-                            label:
-                                '${tournament.registrants.length}/${tournament.maxTeams} teams',
-                            color: AC.cyan,
+                        ),
+                        // Menu
+                        PopupMenuButton<String>(
+                          icon: const Icon(
+                            Icons.more_vert_rounded,
+                            color: AC.textSecondary,
+                            size: 20,
                           ),
-                          if (tournament.pendingCount > 0)
-                            StatusBadge(
-                              label: '${tournament.pendingCount} pending',
-                              color: AC.gold,
+                          color: AC.bg3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          onSelected: (v) {
+                            if (v == 'edit') onEdit();
+                            if (v == 'archive') onArchiveToggle();
+                            if (v == 'delete') onDelete();
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem<String>(
+                              value: 'edit',
+                              child: Text('Edit'),
                             ),
+                            PopupMenuItem<String>(
+                              value: 'archive',
+                              child: Text(
+                                tournament.isArchived ? 'Restore' : 'Archive',
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // ── Stats row ───────────────────────────────────────
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AC.bg3,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          _CardStat(
+                            icon: Icons.groups_rounded,
+                            label: 'Teams',
+                            value:
+                                '${tournament.registrants.length}/${tournament.maxTeams}',
+                            tone: AC.cyan,
+                          ),
+                          _vertDivider(),
+                          _CardStat(
+                            icon: Icons.payments_rounded,
+                            label: 'Prize',
+                            value: tournament.prize,
+                            tone: AC.gold,
+                          ),
+                          _vertDivider(),
+                          _CardStat(
+                            icon: Icons.account_tree_rounded,
+                            label: 'Format',
+                            value: tournament.format.label,
+                            tone: AC.violet,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // ── Organizer + location footer ─────────────────────
+                    if ((tournament.organizer != null &&
+                            tournament.organizer!.isNotEmpty) ||
+                        (tournament.location != null &&
+                            tournament.location!.isNotEmpty)) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          if (tournament.organizer?.isNotEmpty == true) ...[
+                            const Icon(Icons.business_rounded,
+                                size: 12, color: AC.textMuted),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                tournament.organizer!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AT.caption,
+                              ),
+                            ),
+                          ],
+                          if (tournament.organizer?.isNotEmpty == true &&
+                              tournament.location?.isNotEmpty == true)
+                            const SizedBox(width: 12),
+                          if (tournament.location?.isNotEmpty == true) ...[
+                            const Icon(Icons.place_rounded,
+                                size: 12, color: AC.textMuted),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                tournament.location!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AT.caption,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  icon: const Icon(
-                    Icons.more_horiz_rounded,
-                    color: AC.textSecondary,
-                  ),
-                  color: AC.bg3,
-                  onSelected: (value) {
-                    if (value == 'edit') onEdit();
-                    if (value == 'archive') onArchiveToggle();
-                    if (value == 'delete') onDelete();
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem<String>(
-                      value: 'edit',
-                      child: Text('Edit tournament'),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'archive',
-                      child: Text(
-                        tournament.isArchived ? 'Restore' : 'Archive',
-                      ),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'delete',
-                      child: Text('Delete'),
-                    ),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _MiniTournamentSignal(
-                    label: 'Prize',
-                    value: tournament.prize,
-                    tone: AC.pink,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _MiniTournamentSignal(
-                    label: 'Format',
-                    value: tournament.format.label,
-                    tone: AC.cyan,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _MiniTournamentSignal(
-                    label: 'Location',
-                    value: tournament.location ?? 'TBA',
-                    tone: AC.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _vertDivider() => Container(
+        width: 1,
+        height: 28,
+        margin: const EdgeInsets.symmetric(horizontal: 10),
+        color: AC.border,
+      );
 }
 
-class _TournamentTopMetric extends StatelessWidget {
+class _CardStat extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
   final Color tone;
 
-  const _TournamentTopMetric({
+  const _CardStat({
+    required this.icon,
     required this.label,
     required this.value,
     required this.tone,
@@ -366,26 +556,31 @@ class _TournamentTopMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AC.bg3,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AC.border),
-      ),
+    return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: tone,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
+          Row(
+            children: [
+              Icon(icon, size: 11, color: tone),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: AT.label.copyWith(fontSize: 9, color: AC.textMuted),
+              ),
+            ],
           ),
           const SizedBox(height: 3),
-          Text(label, style: AT.caption),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: tone,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
@@ -529,46 +724,6 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
-            decoration: cardDecor(
-              radius: 24,
-              border: AC.pink.withOpacity(0.16),
-              gradient: AC.gradHero,
-            ),
-            child: Row(
-              children: [
-                AdminLogoBadge(
-                  imageUrl: _logoUrlCtrl.text.trim().isEmpty
-                      ? defaultGameLogoUrl(_game)
-                      : _logoUrlCtrl.text.trim(),
-                  fallback: _gameCtrl.text.trim().isEmpty
-                      ? _game.label
-                      : _gameCtrl.text.trim(),
-                  size: 58,
-                  radius: 18,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isEditing ? 'Update Tournament' : 'Create Tournament',
-                        style: AT.heading.copyWith(fontSize: 20),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Use real game branding, cleaner form sections, and a compact mobile workflow.',
-                        style: AT.body.copyWith(fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 22),
           const SectionHdr(title: 'BASIC INFORMATION'),
           Container(
@@ -1044,6 +1199,7 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
   }
 }
 
+// ── Tournament Detail Screen ──────────────────────────────────────────────────
 class AdminTournamentDetailScreen extends StatefulWidget {
   final Tournament tournament;
 
@@ -1055,201 +1211,176 @@ class AdminTournamentDetailScreen extends StatefulWidget {
 }
 
 class _AdminTournamentDetailScreenState
-    extends State<AdminTournamentDetailScreen> {
+    extends State<AdminTournamentDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabCtrl;
+
+  static const _tabs = [
+    _TabItem(icon: Icons.dashboard_rounded, label: 'Overview'),
+    _TabItem(icon: Icons.groups_rounded, label: 'Teams'),
+    _TabItem(icon: Icons.calendar_month_rounded, label: 'Schedule'),
+    _TabItem(icon: Icons.account_tree_rounded, label: 'Bracket'),
+    _TabItem(icon: Icons.leaderboard_rounded, label: 'Standings'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: _tabs.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final tournament = widget.tournament;
+    final statusColor = tourStatusColor(tournament.status);
 
-    return DefaultTabController(
-      length: 5,
-      child: Scaffold(
-        backgroundColor: AC.bg1,
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) => [
-            SliverAppBar(
-              expandedHeight: 240,
-              stretch: false,
-              floating: false,
-              snap: false,
-              pinned: true,
-              backgroundColor: AC.bg0,
-              surfaceTintColor: Colors.transparent,
-              leading: IconButton(
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: AC.cyan,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.edit_rounded, color: AC.cyan),
-                  onPressed: () async {
-                    final updated = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            TournamentEditorScreen(existing: tournament),
-                      ),
-                    );
-                    if (updated == true && mounted) {
-                      setState(() {});
-                    }
-                  },
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.pin,
-                background: _TournamentHero(tournament: tournament),
-              ),
-              bottom: const PreferredSize(
-                preferredSize: Size.fromHeight(48),
-                child: _TournamentTabs(),
+    return Scaffold(
+      backgroundColor: AC.bg1,
+      // ── Fixed AppBar — never expands, never stretches ──────────────────
+      appBar: AppBar(
+        backgroundColor: AC.bg0,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AC.cyan),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            AdminLogoBadge(
+              imageUrl: tournament.resolvedLogoUrl,
+              fallback: tournament.game.label,
+              size: 32,
+              radius: 9,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tournament.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AC.textPrimary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  Text(
+                    tournament.game.label,
+                    style: const TextStyle(
+                      color: AC.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
-          body: TabBarView(
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _TournamentOverviewTab(tournament: tournament),
-              _TournamentTeamsTab(
-                tournament: tournament,
-                onChanged: () => setState(() {}),
+        ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 4),
+            child: StatusBadge(
+              label: tournament.status.label,
+              color: statusColor,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_rounded, color: AC.cyan),
+            onPressed: () async {
+              final updated = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TournamentEditorScreen(existing: tournament),
+                ),
+              );
+              if (updated == true && mounted) setState(() {});
+            },
+          ),
+        ],
+        // ── Tab bar pinned below app bar ──────────────────────────────────
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: AC.bg0,
+              border: Border(bottom: BorderSide(color: AC.border)),
+            ),
+            child: TabBar(
+              controller: _tabCtrl,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              indicatorColor: AC.cyan,
+              indicatorWeight: 2,
+              labelColor: AC.cyan,
+              unselectedLabelColor: AC.textMuted,
+              labelStyle: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
               ),
-              _TournamentScheduleTab(
-                tournament: tournament,
-                onChanged: () => setState(() {}),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
               ),
-              _TournamentBracketTab(
-                tournament: tournament,
-                onChanged: () => setState(() {}),
-              ),
-              _TournamentStandingsTab(
-                tournament: tournament,
-                onChanged: () => setState(() {}),
-              ),
-            ],
+              tabs: _tabs
+                  .map((t) => Tab(
+                        height: 46,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(t.icon, size: 14),
+                            const SizedBox(width: 6),
+                            Text(t.label.toUpperCase()),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+            ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _TournamentTabs extends StatelessWidget {
-  const _TournamentTabs();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AC.bg0,
-        border: Border(bottom: BorderSide(color: AC.border)),
-      ),
-      child: const TabBar(
-        isScrollable: true,
-        tabAlignment: TabAlignment.start,
-        indicatorColor: AC.cyan,
-        labelColor: AC.cyan,
-        unselectedLabelColor: AC.textMuted,
-        labelStyle: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.1,
-        ),
-        unselectedLabelStyle: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 1.1,
-        ),
-        tabs: [
-          Tab(text: 'OVERVIEW'),
-          Tab(text: 'TEAMS'),
-          Tab(text: 'SCHEDULE'),
-          Tab(text: 'BRACKET'),
-          Tab(text: 'STANDINGS'),
-        ],
-      ),
-    );
-  }
-}
-
-class _TournamentHero extends StatelessWidget {
-  final Tournament tournament;
-
-  const _TournamentHero({required this.tournament});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(gradient: AC.gradHero),
-      child: Stack(
+      body: TabBarView(
+        controller: _tabCtrl,
+        physics: const ClampingScrollPhysics(),
         children: [
-          Positioned(
-            right: -8,
-            bottom: 28,
-            child: Opacity(
-              opacity: 0.08,
-              child: Text(
-                tournament.game.emoji,
-                style: const TextStyle(fontSize: 150),
-              ),
-            ),
+          _TournamentOverviewTab(tournament: tournament),
+          _TournamentTeamsTab(
+            tournament: tournament,
+            onChanged: () => setState(() {}),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 80, 20, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Row(
-                  children: [
-                    AdminLogoBadge(
-                      imageUrl: tournament.resolvedLogoUrl,
-                      fallback: tournament.game.label,
-                      size: 54,
-                      radius: 16,
-                    ),
-                    const SizedBox(width: 12),
-                    StatusBadge(
-                      label: tournament.status.label,
-                      color: tourStatusColor(tournament.status),
-                    ),
-                    const SizedBox(width: 8),
-                    StatusBadge(label: tournament.game.label, color: AC.cyan),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Text(tournament.title, style: AT.display),
-                const SizedBox(height: 6),
-                Text(
-                  '${tournament.organizer ?? 'Organizer TBA'} • ${tournament.location ?? 'Location TBA'}',
-                  style: AT.body,
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    StatusBadge(label: tournament.prize, color: AC.gold),
-                    StatusBadge(
-                      label:
-                          '${tournament.registrants.length}/${tournament.maxTeams} teams',
-                      color: AC.cyan,
-                    ),
-                    StatusBadge(
-                      label: tournament.format.label,
-                      color: AC.violet,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          _TournamentScheduleTab(
+            tournament: tournament,
+            onChanged: () => setState(() {}),
+          ),
+          _TournamentBracketTab(
+            tournament: tournament,
+            onChanged: () => setState(() {}),
+          ),
+          _TournamentStandingsTab(
+            tournament: tournament,
+            onChanged: () => setState(() {}),
           ),
         ],
       ),
     );
   }
+}
+
+class _TabItem {
+  final IconData icon;
+  final String label;
+  const _TabItem({required this.icon, required this.label});
 }
 
 class _TournamentOverviewTab extends StatelessWidget {

@@ -29,6 +29,7 @@ class _AdminUsersViewState extends State<AdminUsersView> {
 
     return Column(
       children: [
+        // Fixed header — never resizes on scroll
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
           child: Column(
@@ -98,6 +99,8 @@ class _AdminUsersViewState extends State<AdminUsersView> {
             ],
           ),
         ),
+
+        // Scrollable list — only this part scrolls
         Expanded(
           child: users.isEmpty
               ? const EmptyState(
@@ -109,6 +112,7 @@ class _AdminUsersViewState extends State<AdminUsersView> {
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                   itemCount: users.length,
+                  physics: const BouncingScrollPhysics(),
                   itemBuilder: (context, index) {
                     final user = users[index];
                     final tone = userStatusColor(user.status);

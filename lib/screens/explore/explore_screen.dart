@@ -7,6 +7,7 @@ import '../../models/models.dart';
 import '../../data/mock_data.dart';
 import '../../widgets/common/widgets.dart';
 import '../tournament/tournament_detail_screen.dart';
+import '../profile/profile_screen.dart'; // ← adjust path to match your project structure
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -62,6 +63,16 @@ class ExploreScreenState extends State<ExploreScreen> {
   void _handleFilterUpdate(VoidCallback updateFn) {
     HapticFeedback.selectionClick();
     setState(updateFn);
+  }
+
+  /// Navigate to ProfileScreen. Pass [scrollToAlerts] true to jump to alerts.
+  void _navigateToProfile({required bool scrollToAlerts}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProfileScreen(scrollToAlerts: scrollToAlerts),
+      ),
+    );
   }
 
   @override
@@ -148,57 +159,77 @@ class ExploreScreenState extends State<ExploreScreen> {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.bg1,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.magenta, width: 1.5),
-            ),
-            alignment: Alignment.center,
-            child: const Text(
-              'VS',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.0,
+          // ── Tappable avatar → ProfileScreen ──────────────────────────
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _navigateToProfile(scrollToAlerts: false);
+            },
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.bg1,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.magenta, width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'VS',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 12),
+
+          // ── Tappable name/tier row → ProfileScreen ───────────────────
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Vortex_Striker',
-                    style: AppText.heading
-                        .copyWith(fontSize: 16, letterSpacing: 0.3)),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                            color: AppColors.green, shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Text('PRO LEAGUE TIER',
-                        style: AppText.caption.copyWith(
-                            color: AppColors.cyan,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5)),
-                  ],
-                ),
-              ],
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                _navigateToProfile(scrollToAlerts: false);
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Vortex_Striker',
+                      style: AppText.heading
+                          .copyWith(fontSize: 16, letterSpacing: 0.3)),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                              color: AppColors.green, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Text('PRO LEAGUE TIER',
+                          style: AppText.caption.copyWith(
+                              color: AppColors.cyan,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5)),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
+
+          // ── Bell icon → ProfileScreen scrolled to Alerts ─────────────
           _buildHeaderIconButton(Icons.notifications_none_rounded, () {
             HapticFeedback.lightImpact();
+            _navigateToProfile(scrollToAlerts: true);
           }),
           const SizedBox(width: 10),
+
+          // ── Search icon → inline search bar ──────────────────────────
           _buildHeaderIconButton(Icons.search_rounded, () {
             HapticFeedback.lightImpact();
             setState(() => _isSearchActive = true);
