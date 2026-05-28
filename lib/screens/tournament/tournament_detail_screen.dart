@@ -605,6 +605,47 @@ TeamModel? _findStandingTeam(
       _findTournamentTeam(tournament, standing.teamName);
 }
 
+List<StandingModel> _standingsSyncedWithTeams(TournamentModel tournament) {
+  if (tournament.teams.isEmpty) return tournament.standings;
+
+  final synced = <StandingModel>[];
+  final includedTeamIds = <String>{};
+
+  for (final standing in tournament.standings) {
+    final team = _findStandingTeam(tournament, standing);
+    if (team == null) continue;
+    final teamKey = _teamKey(team.id);
+    if (!includedTeamIds.add(teamKey)) continue;
+    synced.add(
+      StandingModel(
+        teamId: team.id,
+        teamName: team.name,
+        played: standing.played,
+        wins: standing.wins,
+        losses: standing.losses,
+        points: standing.points,
+      ),
+    );
+  }
+
+  for (final team in tournament.teams) {
+    final teamKey = _teamKey(team.id);
+    if (!includedTeamIds.add(teamKey)) continue;
+    synced.add(
+      StandingModel(
+        teamId: team.id,
+        teamName: team.name,
+        played: 0,
+        wins: 0,
+        losses: 0,
+        points: 0,
+      ),
+    );
+  }
+
+  return synced;
+}
+
 String _teamNameForDisplay(TeamModel? team, String fallback) {
   if (team != null) return team.name;
   final trimmed = fallback.trim();
@@ -671,7 +712,8 @@ class _TeamsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tournament.teams.isEmpty) {
+    final teams = tournament.teams;
+    if (teams.isEmpty) {
       return const EmptyState(
           icon: AppIcons.team,
           title: 'No Teams Yet',
@@ -680,7 +722,7 @@ class _TeamsTab extends StatelessWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-      itemCount: tournament.teams.length + 1,
+      itemCount: teams.length + 1,
       itemBuilder: (_, i) {
         if (i == 0) {
           return Padding(
@@ -699,7 +741,7 @@ class _TeamsTab extends StatelessWidget {
                   const Icon(AppIcons.team, size: 13, color: AppColors.cyan),
                   const SizedBox(width: 6),
                   Text(
-                    '${tournament.teams.length} REGISTERED',
+                    '${teams.length} REGISTERED',
                     style: AppText.label.copyWith(
                         color: AppColors.cyan, fontSize: 10, letterSpacing: 1),
                   ),
@@ -708,7 +750,7 @@ class _TeamsTab extends StatelessWidget {
             ]),
           );
         }
-        final team = tournament.teams[i - 1];
+        final team = teams[i - 1];
         return _TeamCard(
           team: team,
           rank: i,
@@ -1348,15 +1390,16 @@ class _StandingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tournament.standings.isEmpty) {
+    final standings = _standingsSyncedWithTeams(tournament);
+    if (standings.isEmpty) {
       return const EmptyState(
           icon: AppIcons.leaderboard,
           title: 'No Standings Yet',
           subtitle: 'Standings will appear once matches begin');
     }
 
-    final sorted = List.from(tournament.standings)
-      ..sort((a, b) => (b.points as int).compareTo(a.points as int));
+    final sorted = List<StandingModel>.from(standings)
+      ..sort((a, b) => b.points.compareTo(a.points));
 
     final top3 = sorted.take(3).toList();
 
@@ -1528,7 +1571,7 @@ class _StandingsTab extends StatelessWidget {
 // ─── Improved Podium ──────────────────────────────────────────────────────────
 class _ImprovedPodiumRow extends StatelessWidget {
   final TournamentModel tournament;
-  final List top3;
+  final List<StandingModel> top3;
   const _ImprovedPodiumRow({required this.tournament, required this.top3});
 
   @override
@@ -1603,7 +1646,7 @@ class _ImprovedPodiumRow extends StatelessWidget {
 
 class _PodiumPillar extends StatelessWidget {
   final TournamentModel tournament;
-  final dynamic entry;
+  final StandingModel entry;
   final int rank;
   final double pillarHeight;
   final Color accentColor;
@@ -1623,7 +1666,7 @@ class _PodiumPillar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final standing = entry as StandingModel;
+    final standing = entry;
     final team = _findStandingTeam(tournament, standing);
     final teamName = _teamNameForDisplay(team, standing.teamName);
 

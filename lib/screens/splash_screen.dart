@@ -111,10 +111,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
               // --- LOGO ---
               SizedBox(
-                height: 180.0,
-                width: 180.0,
+                height: 280.0,
+                width: 280.0,
                 child: Image.asset(
-                  'assets/images/logo.png',
+                  'assets/images/game_arena_logo.png',
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                     return const Icon(Icons.change_history_rounded,

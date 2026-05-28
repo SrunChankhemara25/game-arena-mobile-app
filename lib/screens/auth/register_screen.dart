@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../services/auth_service.dart';
+import 'login_screen.dart';
 import 'verify_code_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -479,7 +480,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 recognizer: TapGestureRecognizer()
                                   ..onTap = () {
                                     HapticFeedback.lightImpact();
-                                    Navigator.pop(context);
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const LoginScreen(),
+                                      ),
+                                    );
                                   },
                               ),
                             ],

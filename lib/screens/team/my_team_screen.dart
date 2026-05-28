@@ -117,42 +117,10 @@ class _MyTeamScreenState extends State<MyTeamScreen>
   }
 
   void _editTeamName() async {
-    final ctrl = TextEditingController(text: _myTeam?.name ?? '');
     final result = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.bg2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: AppColors.border),
-        ),
-        title: Text('EDIT TEAM NAME',
-            style: AppText.heading.copyWith(letterSpacing: 1)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: 'Team name...',
-            prefixIcon: const Icon(Icons.shield_rounded,
-                color: AppColors.textMuted, size: 20),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text('CANCEL',
-                style: AppText.label.copyWith(color: AppColors.textMuted)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, ctrl.text.trim()),
-            child: Text('SAVE',
-                style: AppText.label.copyWith(color: AppColors.cyan)),
-          ),
-        ],
-      ),
+      builder: (_) => _EditTeamNameDialog(initialName: _myTeam?.name ?? ''),
     );
-    ctrl.dispose();
     if (!mounted) return;
     if (result != null && result.isNotEmpty && _myTeam != null) {
       await _persistTeam(_myTeam!.copyWith(name: result));
@@ -186,13 +154,12 @@ class _MyTeamScreenState extends State<MyTeamScreen>
     setState(() => _myTeam = updated);
   }
 
-  // ── KEY FIX: await sheet close before opening next dialog ──
-  void _showTeamMenu() {
+  Future<void> _showTeamMenu() async {
     HapticFeedback.lightImpact();
-    showModalBottomSheet(
+    final action = await showModalBottomSheet<_TeamMenuAction>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
+      builder: (sheetContext) => Container(
         decoration: BoxDecoration(
           color: AppColors.bg2,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -220,42 +187,38 @@ class _MyTeamScreenState extends State<MyTeamScreen>
               icon: Icons.edit_rounded,
               label: 'Edit Team Name',
               color: AppColors.cyan,
-              onTap: () async {
-                Navigator.pop(context); // close sheet
-                await Future.delayed(
-                    const Duration(milliseconds: 300)); // wait for animation
-                if (!mounted) return;
-                _editTeamName();
-              },
+              onTap: () =>
+                  Navigator.pop(sheetContext, _TeamMenuAction.editTeamName),
             ),
             const SizedBox(height: 12),
             _MenuTile(
               icon: Icons.add_photo_alternate_rounded,
               label: 'Change Team Logo',
               color: AppColors.purple,
-              onTap: () async {
-                Navigator.pop(context);
-                await Future.delayed(const Duration(milliseconds: 300));
-                if (!mounted) return;
-                _changeTeamLogo();
-              },
+              onTap: () =>
+                  Navigator.pop(sheetContext, _TeamMenuAction.changeLogo),
             ),
             const SizedBox(height: 12),
             _MenuTile(
               icon: Icons.delete_forever_rounded,
               label: 'Disband Squad',
               color: AppColors.red,
-              onTap: () async {
-                Navigator.pop(context);
-                await Future.delayed(const Duration(milliseconds: 300));
-                if (!mounted) return;
-                _deleteSquad();
-              },
+              onTap: () =>
+                  Navigator.pop(sheetContext, _TeamMenuAction.deleteSquad),
             ),
           ],
         ),
       ),
     );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _TeamMenuAction.editTeamName:
+        _editTeamName();
+      case _TeamMenuAction.changeLogo:
+        _changeTeamLogo();
+      case _TeamMenuAction.deleteSquad:
+        _deleteSquad();
+    }
   }
 
   @override
@@ -318,6 +281,68 @@ class _MyTeamScreenState extends State<MyTeamScreen>
         await MediaService.pickImage(maxWidth: 640, imageQuality: 76);
     if (picked == null || !mounted) return;
     await _persistTeam(team.copyWith(logoUrl: picked.dataUrl));
+  }
+}
+
+enum _TeamMenuAction { editTeamName, changeLogo, deleteSquad }
+
+class _EditTeamNameDialog extends StatefulWidget {
+  final String initialName;
+
+  const _EditTeamNameDialog({required this.initialName});
+
+  @override
+  State<_EditTeamNameDialog> createState() => _EditTeamNameDialogState();
+}
+
+class _EditTeamNameDialogState extends State<_EditTeamNameDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.bg2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: AppColors.border),
+      ),
+      title: Text('EDIT TEAM NAME',
+          style: AppText.heading.copyWith(letterSpacing: 1)),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
+        decoration: InputDecoration(
+          hintText: 'Team name...',
+          prefixIcon: const Icon(Icons.shield_rounded,
+              color: AppColors.textMuted, size: 20),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('CANCEL',
+              style: AppText.label.copyWith(color: AppColors.textMuted)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: Text('SAVE',
+              style: AppText.label.copyWith(color: AppColors.cyan)),
+        ),
+      ],
+    );
   }
 }
 
