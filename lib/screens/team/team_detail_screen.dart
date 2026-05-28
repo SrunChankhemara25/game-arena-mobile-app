@@ -3,20 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../models/models.dart';
+import '../../services/backend_service.dart';
 import '../../services/media_service.dart';
 import '../../widgets/common/widgets.dart';
 import 'player_detail_screen.dart';
 
-// ─── Team Detail Screen ───────────────────────────────────────────────────────
 class TeamDetailScreen extends StatefulWidget {
   final TeamModel team;
-  // ── FIX: Added isViewOnly flag, defaulting to true to protect other teams ──
   final bool isViewOnly;
 
   const TeamDetailScreen({
     super.key,
     required this.team,
-    this.isViewOnly = true, // Defaults to view-only mode for tournament screen
+    this.isViewOnly = true,
   });
 
   @override
@@ -28,33 +27,54 @@ class _TeamDetailScreenState extends State<TeamDetailScreen>
   late final TabController _tabController;
   late TeamModel _team;
 
+  void _onTabChanged() {
+    if (!mounted) return;
+    if (_tabController.indexIsChanging) HapticFeedback.selectionClick();
+  }
+
+  // ── KEY FIX: defer pop to after the current frame so TabController
+  //    finishes detaching from TabBarView before the widget is disposed ──
+  void _safePop() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.pop(context, _team);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _team = widget.team;
     _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) HapticFeedback.selectionClick();
-    });
+    _tabController.addListener(_onTabChanged);
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
 
   void _onTeamChanged(TeamModel updated) {
+    if (!mounted) return;
     setState(() => _team = updated);
+    if (widget.isViewOnly) return;
+    BackendService.instance.saveTeam(updated).catchError((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Team update was not saved. Please try again.'),
+        ),
+      );
+    });
   }
 
-  // ── FIX 1: Use canPop + onPopInvokedWithResult to avoid double-pop ──
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) Navigator.pop(context, _team);
+        if (!didPop) _safePop(); // ── use _safePop
       },
       child: Scaffold(
         backgroundColor: AppColors.bg0,
@@ -75,23 +95,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen>
                 ),
               ),
             ),
-            // ── FIX 2: Use DefaultTabController-aware NestedScrollView
-            //    and wrap body in a SizedBox.expand so the TabBarView
-            //    fills the remaining space properly without overlapping
-            //    the pinned header/tab bar.
             NestedScrollView(
               physics: const BouncingScrollPhysics(),
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                // ── SLIVER 1: Hero only — no tab bar inside ──────────────
-                // expandedHeight = toolbar(56) + safeAreaTop(~44) +
-                //   logo row(76) + gaps(32) + badges+location(~60) +
-                //   stat cards(~90) + bottom padding(24) ≈ 382
-                // We use 390 for a little extra breathing room.
                 SliverAppBar(
                   expandedHeight: 320,
                   pinned: true,
                   stretch: true,
-                  // toolbarHeight default is 56 — keep it so back button sits right
                   backgroundColor: AppColors.bg0.withOpacity(0.9),
                   elevation: 0,
                   scrolledUnderElevation: 0,
@@ -100,7 +110,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen>
                         size: 18, color: AppColors.textPrimary),
                     onPressed: () {
                       HapticFeedback.lightImpact();
-                      Navigator.pop(context, _team);
+                      _safePop(); // ── use _safePop
                     },
                   ),
                   flexibleSpace: FlexibleSpaceBar(
@@ -108,9 +118,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen>
                     collapseMode: CollapseMode.pin,
                     background: _TeamHero(team: _team),
                   ),
-                  // NO bottom: here — tab bar is its own sliver below
                 ),
-                // ── SLIVER 2: Tab bar — pinned separately ────────────────
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _StickyTabBarDelegate(
@@ -143,12 +151,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen>
                     _RosterTab(
                       team: _team,
                       onTeamChanged: _onTeamChanged,
-                      isViewOnly: widget.isViewOnly, // ── Passed Flag
+                      isViewOnly: widget.isViewOnly,
                     ),
                     _InfoTab(
                       team: _team,
                       onTeamChanged: _onTeamChanged,
-                      isViewOnly: widget.isViewOnly, // ── Passed Flag
+                      isViewOnly: widget.isViewOnly,
                     ),
                     _MatchesTab(team: _team),
                   ],
@@ -163,9 +171,6 @@ class _TeamDetailScreenState extends State<TeamDetailScreen>
 }
 
 // ─── Sticky Tab Bar Delegate ──────────────────────────────────────────────────
-// Wraps a TabBar in a SliverPersistentHeader so it pins independently
-// from the SliverAppBar — this is the only reliable way to prevent
-// the tab bar from overlapping the hero content.
 class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
   const _StickyTabBarDelegate(this.tabBar);
@@ -382,7 +387,7 @@ class _WavePainter extends CustomPainter {
 class _RosterTab extends StatefulWidget {
   final TeamModel team;
   final ValueChanged<TeamModel> onTeamChanged;
-  final bool isViewOnly; // ── Passed Flag
+  final bool isViewOnly;
 
   const _RosterTab({
     required this.team,
@@ -457,6 +462,7 @@ class _RosterTabState extends State<_RosterTab> {
         defaultType: defaultType,
       ),
     );
+    if (!mounted) return;
     if (result != null) {
       final newPlayer = PlayerModel(
         id: 'p_${DateTime.now().millisecondsSinceEpoch}',
@@ -496,7 +502,7 @@ class _RosterTabState extends State<_RosterTab> {
           mainLineup.length,
           AppColors.cyan,
           onAdd: () => _addPlayer(PlayerType.main),
-          isViewOnly: widget.isViewOnly, // ── Conditionally hide add buttons
+          isViewOnly: widget.isViewOnly,
         ),
         const SizedBox(height: 12),
         if (mainLineup.isEmpty)
@@ -596,7 +602,7 @@ class _RosterTabState extends State<_RosterTab> {
           ),
         ),
         const Spacer(),
-        if (!isViewOnly) // ── Only show ADD button if they are managing
+        if (!isViewOnly)
           GestureDetector(
             onTap: onAdd,
             child: Container(
@@ -656,7 +662,7 @@ class _PlayerCard extends StatelessWidget {
   final PlayerModel player;
   final Color accentColor;
   final VoidCallback onDelete;
-  final bool isViewOnly; // ── Flag for deleting
+  final bool isViewOnly;
 
   const _PlayerCard({
     required this.player,
@@ -679,9 +685,7 @@ class _PlayerCard extends StatelessWidget {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(18),
           clipBehavior: Clip.antiAlias,
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: InkWell(
             onTap: () {
               HapticFeedback.lightImpact();
               Navigator.push(
@@ -690,116 +694,149 @@ class _PlayerCard extends StatelessWidget {
                     builder: (_) => PlayerDetailScreen(player: player)),
               );
             },
-            leading: PlayerAvatar(player: player, size: 48),
-            title: Row(
-              children: [
-                Text(
-                  player.ign,
-                  style: AppText.bodyMd.copyWith(
-                      color: accentColor, fontWeight: FontWeight.bold),
-                ),
-                if (player.jerseyNumber != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                        color: AppColors.bg3,
-                        borderRadius: BorderRadius.circular(6)),
-                    child: Text(
-                      '#${player.jerseyNumber}',
-                      style: AppText.caption.copyWith(
-                          color: AppColors.textMuted,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  PlayerAvatar(player: player, size: 48),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                player.ign,
+                                style: AppText.bodyMd.copyWith(
+                                    color: accentColor,
+                                    fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (player.jerseyNumber != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                    color: AppColors.bg3,
+                                    borderRadius: BorderRadius.circular(6)),
+                                child: Text(
+                                  '#${player.jerseyNumber}',
+                                  style: AppText.caption.copyWith(
+                                      color: AppColors.textMuted,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          player.fullName ?? 'Identity Redacted',
+                          style: AppText.body.copyWith(
+                              fontSize: 13, color: AppColors.textSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 124),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: accentColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: accentColor.withOpacity(0.25)),
+                                ),
+                                child: Text(
+                                  (player.role ?? 'OPERATIVE').toUpperCase(),
+                                  style: AppText.label.copyWith(
+                                      color: accentColor,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 124),
+                              child: Text(
+                                player.nationality ?? 'Global',
+                                style: AppText.caption
+                                    .copyWith(color: AppColors.textMuted),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 96),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          player.type.label.toUpperCase(),
+                          style: AppText.label.copyWith(
+                              color: AppColors.textMuted, fontSize: 9),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                        ),
+                        if (!isViewOnly) ...[
+                          const SizedBox(height: 10),
+                          GestureDetector(
+                            onTap: onDelete,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.red.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppColors.red.withOpacity(0.3)),
+                              ),
+                              child: const Icon(Icons.delete_outline_rounded,
+                                  color: AppColors.red, size: 16),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 2),
-                Text(player.fullName ?? 'Identity Redacted',
-                    style: AppText.body.copyWith(
-                        fontSize: 13, color: AppColors.textSecondary)),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                        border:
-                            Border.all(color: accentColor.withOpacity(0.25)),
-                      ),
-                      child: Text(
-                        (player.role ?? 'OPERATIVE').toUpperCase(),
-                        style: AppText.label.copyWith(
-                            color: accentColor,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      player.nationality ?? 'Global',
-                      style:
-                          AppText.caption.copyWith(color: AppColors.textMuted),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      player.type.label.toUpperCase(),
-                      style: AppText.label
-                          .copyWith(color: AppColors.textMuted, fontSize: 9),
-                    ),
-                  ],
-                ),
-                if (!isViewOnly) ...[
-                  // ── Only show delete button if they are managing
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: onDelete,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.red.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(8),
-                        border:
-                            Border.all(color: AppColors.red.withOpacity(0.3)),
-                      ),
-                      child: const Icon(Icons.delete_outline_rounded,
-                          color: AppColors.red, size: 16),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ), // closes Material
-        ), // closes Container
-      ), // closes Padding
+          ),
+        ),
+      ),
     );
   }
 }
 
-// ─── Profile / Info Tab (Conditionally Editable) ────────────────────────────
+// ─── Profile / Info Tab ───────────────────────────────────────────────────────
 class _InfoTab extends StatefulWidget {
   final TeamModel team;
   final ValueChanged<TeamModel> onTeamChanged;
-  final bool isViewOnly; // ── Passed Flag
+  final bool isViewOnly;
 
   const _InfoTab({
     required this.team,
@@ -841,6 +878,7 @@ class _InfoTabState extends State<_InfoTab> {
   }
 
   void _save() {
+    if (!mounted) return;
     final updated = widget.team.copyWith(
       name: _name.text.trim().isNotEmpty ? _name.text.trim() : widget.team.name,
       contactEmail: _email.text.trim(),
@@ -864,12 +902,13 @@ class _InfoTabState extends State<_InfoTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text('TEAM PROFILE', style: _sectionStyle),
               if (!widget.isViewOnly) ...[
-                // ── Only show EDIT and CANCEL controls if managing
-                const Spacer(),
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
@@ -912,9 +951,9 @@ class _InfoTabState extends State<_InfoTab> {
                   ),
                 ),
                 if (_editing) ...[
-                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () {
+                      if (!mounted) return;
                       HapticFeedback.lightImpact();
                       _name.text = widget.team.name;
                       _email.text = widget.team.contactEmail ?? '';
@@ -1299,7 +1338,9 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
     super.initState();
     _type = widget.defaultType;
     _roleController.text = _availableRoles.first;
-    _roleController.addListener(() => setState(() {}));
+    _roleController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   void _save() {
@@ -1650,6 +1691,7 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
                             child: child!,
                           ),
                         );
+                        if (!mounted) return;
                         if (date != null) {
                           setState(() => _dob.text =
                               '${date.year}-${date.month.toString().padLeft(2, "0")}-${date.day.toString().padLeft(2, "0")}');

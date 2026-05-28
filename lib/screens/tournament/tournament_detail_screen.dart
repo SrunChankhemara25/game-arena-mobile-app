@@ -589,6 +589,81 @@ class _DetailRow extends StatelessWidget {
       ]);
 }
 
+String _teamKey(String value) => value.trim().toLowerCase();
+
+TeamModel? _findTournamentTeam(TournamentModel tournament, String? value) {
+  final key = _teamKey(value ?? '');
+  if (key.isEmpty || key == 'tbd') return null;
+  return tournament.teams.where((team) {
+    return _teamKey(team.id) == key || _teamKey(team.name) == key;
+  }).firstOrNull;
+}
+
+TeamModel? _findStandingTeam(
+    TournamentModel tournament, StandingModel standing) {
+  return _findTournamentTeam(tournament, standing.teamId) ??
+      _findTournamentTeam(tournament, standing.teamName);
+}
+
+String _teamNameForDisplay(TeamModel? team, String fallback) {
+  if (team != null) return team.name;
+  final trimmed = fallback.trim();
+  return trimmed.isEmpty ? 'TBD' : trimmed;
+}
+
+String _compactTeamInitials(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty || _teamKey(trimmed) == 'tbd') return '?';
+  final parts = trimmed.split(RegExp(r'\s+'));
+  if (parts.length == 1) {
+    final take = parts.first.length < 2 ? parts.first.length : 2;
+    return parts.first.substring(0, take).toUpperCase();
+  }
+  return parts.take(2).map((part) => part[0].toUpperCase()).join();
+}
+
+class _TeamMark extends StatelessWidget {
+  final TeamModel? team;
+  final String fallbackName;
+  final double size;
+  final bool muted;
+
+  const _TeamMark({
+    required this.team,
+    required this.fallbackName,
+    required this.size,
+    this.muted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (team != null) return TeamAvatar(team: team!, size: size);
+
+    final isTbd =
+        _teamKey(fallbackName) == 'tbd' || fallbackName.trim().isEmpty;
+    final tone = isTbd || muted ? AppColors.textMuted : AppColors.cyan;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.bg3,
+        borderRadius: BorderRadius.circular(size * 0.28),
+        border: Border.all(color: tone.withValues(alpha: 0.35), width: 1.2),
+      ),
+      child: Center(
+        child: Text(
+          _compactTeamInitials(fallbackName),
+          style: AppText.label.copyWith(
+            color: tone,
+            fontSize: size * 0.28,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Teams Tab ────────────────────────────────────────────────────────────────
 class _TeamsTab extends StatelessWidget {
   final TournamentModel tournament;
@@ -782,7 +857,8 @@ class _ScheduleTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tournament.matches.isEmpty) {
+    final matches = tournament.scheduleEntries;
+    if (matches.isEmpty) {
       return const EmptyState(
           icon: AppIcons.clock,
           title: 'No Matches Yet',
@@ -790,7 +866,7 @@ class _ScheduleTab extends StatelessWidget {
     }
 
     final grouped = <String, List<MatchModel>>{};
-    for (final m in tournament.matches) {
+    for (final m in matches) {
       (grouped[m.round] ??= []).add(m);
     }
 
@@ -841,8 +917,7 @@ class _ScheduleMatchCard extends StatelessWidget {
   final TournamentModel tournament;
   const _ScheduleMatchCard({required this.match, required this.tournament});
 
-  TeamModel? _findTeam(String? id) =>
-      id == null ? null : tournament.teams.where((t) => t.id == id).firstOrNull;
+  TeamModel? _findTeam(String? id) => _findTournamentTeam(tournament, id);
 
   @override
   Widget build(BuildContext context) {
@@ -901,6 +976,7 @@ class _ScheduleMatchCard extends StatelessWidget {
             Expanded(
                 child: _TeamScoreWidget(
                     team: t1,
+                    fallbackName: match.team1Id,
                     score: match.score1,
                     isWinner: match.winnerId == match.team1Id,
                     align: CrossAxisAlignment.start)),
@@ -924,6 +1000,7 @@ class _ScheduleMatchCard extends StatelessWidget {
             Expanded(
                 child: _TeamScoreWidget(
                     team: t2,
+                    fallbackName: match.team2Id,
                     score: match.score2,
                     isWinner: match.winnerId == match.team2Id,
                     align: CrossAxisAlignment.end)),
@@ -936,67 +1013,61 @@ class _ScheduleMatchCard extends StatelessWidget {
 
 class _TeamScoreWidget extends StatelessWidget {
   final TeamModel? team;
+  final String fallbackName;
   final int score;
   final bool isWinner;
   final CrossAxisAlignment align;
   const _TeamScoreWidget(
       {required this.team,
+      required this.fallbackName,
       required this.score,
       required this.isWinner,
       required this.align});
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: align,
-        children: [
-          if (team != null) ...[
-            TeamAvatar(team: team!, size: 36),
-            const SizedBox(height: 6),
-            Text(
-              team!.name.split(' ').first,
-              style: AppText.caption.copyWith(
-                  color: isWinner
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (isWinner)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(3),
-                    border: Border.all(
-                        color: AppColors.green.withValues(alpha: 0.3)),
-                  ),
-                  child: Text('WIN',
-                      style: AppText.label
-                          .copyWith(color: AppColors.green, fontSize: 9)),
+  Widget build(BuildContext context) {
+    final teamName = _teamNameForDisplay(team, fallbackName);
+    final isTbd = _teamKey(teamName) == 'tbd';
+
+    return Column(
+      crossAxisAlignment: align,
+      children: [
+        if (!isTbd) ...[
+          _TeamMark(team: team, fallbackName: teamName, size: 36),
+          const SizedBox(height: 6),
+          Text(
+            teamName,
+            style: AppText.caption.copyWith(
+                color:
+                    isWinner ? AppColors.textPrimary : AppColors.textSecondary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (isWinner)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(3),
+                  border:
+                      Border.all(color: AppColors.green.withValues(alpha: 0.3)),
                 ),
+                child: Text('WIN',
+                    style: AppText.label
+                        .copyWith(color: AppColors.green, fontSize: 9)),
               ),
-          ] else ...[
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.bg3,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: const Center(
-                  child: Icon(AppIcons.question,
-                      size: 14, color: AppColors.textMuted)),
             ),
-            const SizedBox(height: 6),
-            Text('TBD',
-                style: AppText.caption.copyWith(color: AppColors.textMuted)),
-          ],
+        ] else ...[
+          _TeamMark(team: null, fallbackName: teamName, size: 36, muted: true),
+          const SizedBox(height: 6),
+          Text(teamName,
+              style: AppText.caption.copyWith(color: AppColors.textMuted)),
         ],
-      );
+      ],
+    );
+  }
 }
 
 class _MatchStatusChip extends StatelessWidget {
@@ -1031,33 +1102,26 @@ class _BracketTab extends StatelessWidget {
   final TournamentModel tournament;
   const _BracketTab({required this.tournament});
 
-  static const _rounds = [
-    'Group Stage - Week 1',
-    'Group Stage - Week 2',
-    'Semi Final',
-    'Grand Final',
-  ];
-
-  TeamModel? _findTeam(String? id) =>
-      id == null ? null : tournament.teams.where((t) => t.id == id).firstOrNull;
+  TeamModel? _findTeam(String? id) => _findTournamentTeam(tournament, id);
 
   @override
   Widget build(BuildContext context) {
-    if (tournament.matches.isEmpty) {
+    final bracketMatches = tournament.bracketEntries;
+    if (bracketMatches.isEmpty) {
       return const EmptyState(
           icon: AppIcons.format,
           title: 'Bracket Not Available',
           subtitle: 'The bracket will be generated after registration closes');
     }
 
-    // Build list of round sections
-    final roundSections = _rounds.map((round) {
-      final matches = tournament.matches
-          .where((m) =>
-              m.round.startsWith(round.split(' - ').first) || m.round == round)
-          .toList();
-      return (round: round, matches: matches);
-    }).toList();
+    final grouped = <String, List<MatchModel>>{};
+    for (final match in bracketMatches) {
+      final round = match.round.trim().isEmpty ? 'Bracket' : match.round.trim();
+      (grouped[round] ??= []).add(match);
+    }
+    final roundSections = grouped.entries
+        .map((entry) => (round: entry.key, matches: entry.value))
+        .toList();
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
@@ -1125,7 +1189,9 @@ class _BracketTab extends StatelessWidget {
                             : _BracketMatchCard(
                                 match: pair[0],
                                 team1: _findTeam(pair[0]!.team1Id),
+                                team1Name: pair[0]!.team1Id,
                                 team2: _findTeam(pair[0]!.team2Id),
+                                team2Name: pair[0]!.team2Id,
                               ),
                       ),
                       const SizedBox(width: 10),
@@ -1136,7 +1202,9 @@ class _BracketTab extends StatelessWidget {
                             : _BracketMatchCard(
                                 match: pair[1],
                                 team1: _findTeam(pair[1]!.team1Id),
+                                team1Name: pair[1]!.team1Id,
                                 team2: _findTeam(pair[1]!.team2Id),
+                                team2Name: pair[1]!.team2Id,
                               ),
                       ),
                     ],
@@ -1155,12 +1223,16 @@ class _BracketTab extends StatelessWidget {
 class _BracketMatchCard extends StatelessWidget {
   final MatchModel? match;
   final TeamModel? team1;
+  final String? team1Name;
   final TeamModel? team2;
+  final String? team2Name;
   final bool isDummy;
   const _BracketMatchCard(
       {required this.match,
       required this.team1,
+      this.team1Name,
       required this.team2,
+      this.team2Name,
       this.isDummy = false});
 
   @override
@@ -1191,7 +1263,10 @@ class _BracketMatchCard extends StatelessWidget {
             ]),
           ),
         _BracketSlotRow(
-          teamName: isDummy ? 'TBD' : (team1?.name ?? 'TBD'),
+          teamName: isDummy
+              ? 'TBD'
+              : (team1?.name ??
+                  (team1Name?.trim().isNotEmpty == true ? team1Name! : 'TBD')),
           score: match?.score1 ?? 0,
           isWinner:
               match != null && match!.winnerId == match!.team1Id && isDone,
@@ -1199,7 +1274,10 @@ class _BracketMatchCard extends StatelessWidget {
         ),
         Container(height: 0.5, color: AppColors.border),
         _BracketSlotRow(
-          teamName: isDummy ? 'TBD' : (team2?.name ?? 'TBD'),
+          teamName: isDummy
+              ? 'TBD'
+              : (team2?.name ??
+                  (team2Name?.trim().isNotEmpty == true ? team2Name! : 'TBD')),
           score: match?.score2 ?? 0,
           isWinner:
               match != null && match!.winnerId == match!.team2Id && isDone,
@@ -1231,10 +1309,8 @@ class _BracketSlotRow extends StatelessWidget {
               : Colors.transparent,
         ),
         child: Row(children: [
-          if (team != null) ...[
-            TeamAvatar(team: team!, size: 22),
-            const SizedBox(width: 7),
-          ],
+          _TeamMark(team: team, fallbackName: teamName, size: 22),
+          const SizedBox(width: 7),
           if (isWinner)
             const Padding(
               padding: EdgeInsets.only(right: 4),
@@ -1242,7 +1318,7 @@ class _BracketSlotRow extends StatelessWidget {
             ),
           Expanded(
             child: Text(
-              teamName.split(' ').first,
+              _teamNameForDisplay(team, teamName),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isWinner ? FontWeight.w700 : FontWeight.w400,
@@ -1290,7 +1366,7 @@ class _StandingsTab extends StatelessWidget {
         // ── Podium ─────────────────────────────────
         if (top3.isNotEmpty) ...[
           _SectionLabel(text: 'TOP PERFORMERS', icon: AppIcons.trophy),
-          _ImprovedPodiumRow(top3: top3),
+          _ImprovedPodiumRow(tournament: tournament, top3: top3),
           const SizedBox(height: 28),
         ],
 
@@ -1352,6 +1428,7 @@ class _StandingsTab extends StatelessWidget {
                 final isTop1 = rank == 1;
                 final isTop3 = rank <= 3;
                 final isEven = e.key % 2 == 0;
+                final team = _findStandingTeam(tournament, s);
 
                 return Container(
                   padding:
@@ -1379,35 +1456,14 @@ class _StandingsTab extends StatelessWidget {
                     // Team
                     Expanded(
                         child: Row(children: [
-                      // Initials badge
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: isTop1
-                              ? AppColors.gold.withValues(alpha: 0.12)
-                              : AppColors.bg3,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: isTop1
-                                  ? AppColors.gold.withValues(alpha: 0.3)
-                                  : AppColors.border),
-                        ),
-                        child: Center(
-                          child: Text(
-                            s.teamName.length >= 2
-                                ? s.teamName.substring(0, 2)
-                                : s.teamName,
-                            style: AppText.label.copyWith(
-                                color: isTop1 ? AppColors.gold : AppColors.cyan,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 10),
-                          ),
-                        ),
+                      _TeamMark(
+                        team: team,
+                        fallbackName: s.teamName,
+                        size: 30,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                          child: Text(s.teamName,
+                          child: Text(_teamNameForDisplay(team, s.teamName),
                               style: AppText.bodyMd.copyWith(
                                   fontSize: 13,
                                   fontWeight: isTop1
@@ -1471,8 +1527,9 @@ class _StandingsTab extends StatelessWidget {
 
 // ─── Improved Podium ──────────────────────────────────────────────────────────
 class _ImprovedPodiumRow extends StatelessWidget {
+  final TournamentModel tournament;
   final List top3;
-  const _ImprovedPodiumRow({required this.top3});
+  const _ImprovedPodiumRow({required this.tournament, required this.top3});
 
   @override
   Widget build(BuildContext context) {
@@ -1496,6 +1553,7 @@ class _ImprovedPodiumRow extends StatelessWidget {
             if (second != null)
               Expanded(
                   child: _PodiumPillar(
+                tournament: tournament,
                 entry: second,
                 rank: 2,
                 pillarHeight: 56,
@@ -1507,6 +1565,7 @@ class _ImprovedPodiumRow extends StatelessWidget {
             // 1st — centre, tallest
             Expanded(
                 child: _PodiumPillar(
+              tournament: tournament,
               entry: first,
               rank: 1,
               pillarHeight: 80,
@@ -1517,6 +1576,7 @@ class _ImprovedPodiumRow extends StatelessWidget {
             if (third != null)
               Expanded(
                   child: _PodiumPillar(
+                tournament: tournament,
                 entry: third,
                 rank: 3,
                 pillarHeight: 44,
@@ -1542,11 +1602,13 @@ class _ImprovedPodiumRow extends StatelessWidget {
 }
 
 class _PodiumPillar extends StatelessWidget {
+  final TournamentModel tournament;
   final dynamic entry;
   final int rank;
   final double pillarHeight;
   final Color accentColor;
   const _PodiumPillar({
+    required this.tournament,
     required this.entry,
     required this.rank,
     required this.pillarHeight,
@@ -1560,60 +1622,68 @@ class _PodiumPillar extends StatelessWidget {
       };
 
   @override
-  Widget build(BuildContext context) => Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Text(_medal, style: TextStyle(fontSize: rank == 1 ? 26.0 : 20.0)),
-          const SizedBox(height: 6),
-          Text(
-            entry.teamName.split(' ').first,
-            style: AppText.label.copyWith(
-                color: accentColor, fontWeight: FontWeight.w700, fontSize: 11),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+  Widget build(BuildContext context) {
+    final standing = entry as StandingModel;
+    final team = _findStandingTeam(tournament, standing);
+    final teamName = _teamNameForDisplay(team, standing.teamName);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Text(_medal, style: TextStyle(fontSize: rank == 1 ? 26.0 : 20.0)),
+        const SizedBox(height: 6),
+        _TeamMark(
+            team: team, fallbackName: teamName, size: rank == 1 ? 36 : 30),
+        const SizedBox(height: 6),
+        Text(
+          teamName,
+          style: AppText.label.copyWith(
+              color: accentColor, fontWeight: FontWeight.w700, fontSize: 11),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: accentColor.withValues(alpha: 0.3)),
           ),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+          child: Text(
+            '${standing.points} PTS',
+            style: AppText.label
+                .copyWith(color: accentColor, fontSize: 9, letterSpacing: 0.5),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Pillar
+        Container(
+          height: pillarHeight,
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.08),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+            border: Border(
+              top: BorderSide(color: accentColor.withValues(alpha: 0.3)),
+              left: BorderSide(color: accentColor.withValues(alpha: 0.2)),
+              right: BorderSide(color: accentColor.withValues(alpha: 0.2)),
             ),
+          ),
+          child: Center(
             child: Text(
-              '${entry.points} PTS',
-              style: AppText.label.copyWith(
-                  color: accentColor, fontSize: 9, letterSpacing: 0.5),
+              '#$rank',
+              style: TextStyle(
+                  color: accentColor.withValues(alpha: 0.4),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1),
             ),
           ),
-          const SizedBox(height: 8),
-          // Pillar
-          Container(
-            height: pillarHeight,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.08),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(6)),
-              border: Border(
-                top: BorderSide(color: accentColor.withValues(alpha: 0.3)),
-                left: BorderSide(color: accentColor.withValues(alpha: 0.2)),
-                right: BorderSide(color: accentColor.withValues(alpha: 0.2)),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                '#$rank',
-                style: TextStyle(
-                    color: accentColor.withValues(alpha: 0.4),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1),
-              ),
-            ),
-          ),
-        ],
-      );
+        ),
+      ],
+    );
+  }
 }
 
 class _PodiumBase extends StatelessWidget {

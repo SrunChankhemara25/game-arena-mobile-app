@@ -44,10 +44,6 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
 
   @override
   Widget build(BuildContext context) {
-    final activeHistory = _history.where((record) => !record.archived).toList();
-    final archivedHistory =
-        _history.where((record) => record.archived).toList();
-
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: SingleChildScrollView(
@@ -244,38 +240,19 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
             const SizedBox(height: 32),
 
             // ── History ──────────────────────────────────────────────────
-            if (activeHistory.isNotEmpty) ...[
+            if (_history.isNotEmpty) ...[
               const SectionHdr(title: 'HISTORY'),
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: activeHistory.length,
+                itemCount: _history.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
-                  final record = activeHistory[index];
+                  final record =
+                      _history[index]; // sorted newest-first by stream
                   return _BroadcastHistoryTile(
                     record: record,
                     onDelete: () => _confirmDelete(record),
-                    onArchive: () => _archiveRecord(record, true),
-                    onTap: () => _showDetail(record),
-                  );
-                },
-              ),
-            ],
-            if (archivedHistory.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              const SectionHdr(title: 'ARCHIVED'),
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: archivedHistory.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final record = archivedHistory[index];
-                  return _BroadcastHistoryTile(
-                    record: record,
-                    onDelete: () => _confirmDelete(record),
-                    onArchive: () => _archiveRecord(record, false),
                     onTap: () => _showDetail(record),
                   );
                 },
@@ -368,19 +345,6 @@ class _AdminBroadcastViewState extends State<AdminBroadcastView> {
                 const Text('Delete', style: TextStyle(color: Colors.redAccent)),
           ),
         ],
-      ),
-    );
-  }
-
-  Future<void> _archiveRecord(BroadcastRecord record, bool archived) async {
-    await DB.archiveBroadcastRecord(record.id, archived);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(archived ? 'Broadcast archived' : 'Broadcast restored'),
-        backgroundColor: AC.bg3,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
@@ -539,13 +503,11 @@ class _InfoChip extends StatelessWidget {
 class _BroadcastHistoryTile extends StatelessWidget {
   final BroadcastRecord record;
   final VoidCallback onDelete;
-  final VoidCallback onArchive;
   final VoidCallback onTap;
 
   const _BroadcastHistoryTile({
     required this.record,
     required this.onDelete,
-    required this.onArchive,
     required this.onTap,
   });
 
@@ -597,9 +559,15 @@ class _BroadcastHistoryTile extends StatelessWidget {
                       const Icon(Icons.people_rounded,
                           color: AC.textMuted, size: 12),
                       const SizedBox(width: 4),
-                      Text(record.recipient,
-                          style: AT.caption.copyWith(color: AC.cyan)),
-                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          record.recipient,
+                          style: AT.caption.copyWith(color: AC.cyan),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       const Icon(Icons.access_time_rounded,
                           color: AC.textMuted, size: 12),
                       const SizedBox(width: 4),
@@ -617,28 +585,8 @@ class _BroadcastHistoryTile extends StatelessWidget {
                   color: AC.textMuted, size: 20),
               onSelected: (value) {
                 if (value == 'delete') onDelete();
-                if (value == 'archive') onArchive();
               },
               itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'archive',
-                  child: Row(
-                    children: [
-                      Icon(
-                        record.archived
-                            ? Icons.unarchive_outlined
-                            : Icons.archive_outlined,
-                        color: AC.cyan,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        record.archived ? 'Unarchive' : 'Archive',
-                        style: AT.body.copyWith(color: AC.cyan),
-                      ),
-                    ],
-                  ),
-                ),
                 PopupMenuItem(
                   value: 'delete',
                   child: Row(

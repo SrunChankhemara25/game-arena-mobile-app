@@ -154,27 +154,152 @@ class BackendService {
     final normalized = team.copyWith(
       ownerEmail: team.ownerEmail?.trim().toLowerCase(),
     );
-    await _teams.doc(normalized.id).set(normalized.toMap());
+    final tournaments = await getTournaments();
+    final batch = _db.batch();
+
+    batch.set(_teams.doc(normalized.id), normalized.toMap());
+
+    for (final tournament in tournaments) {
+      var changed = false;
+      final oldRefs = <String>{normalized.id.trim().toLowerCase()};
+      final updatedTeams = tournament.teams.map((registeredTeam) {
+        if (registeredTeam.id != normalized.id) return registeredTeam;
+        changed = true;
+        oldRefs.add(registeredTeam.name.trim().toLowerCase());
+        oldRefs.add(normalized.name.trim().toLowerCase());
+        return normalized.copyWith(
+          status: registeredTeam.status,
+          registeredTournamentIds: normalized.registeredTournamentIds.isNotEmpty
+              ? normalized.registeredTournamentIds
+              : registeredTeam.registeredTournamentIds,
+        );
+      }).toList();
+
+      if (changed) {
+        bool isTeamRef(String? value) =>
+            value != null && oldRefs.contains(value.trim().toLowerCase());
+
+        MatchModel syncMatchTeam(MatchModel match) {
+          return MatchModel(
+            id: match.id,
+            tournamentId: match.tournamentId,
+            team1Id: isTeamRef(match.team1Id) ? normalized.id : match.team1Id,
+            team2Id: isTeamRef(match.team2Id) ? normalized.id : match.team2Id,
+            score1: match.score1,
+            score2: match.score2,
+            status: match.status,
+            round: match.round,
+            winnerId:
+                isTeamRef(match.winnerId) ? normalized.id : match.winnerId,
+            scheduledAt: match.scheduledAt,
+            venue: match.venue,
+          );
+        }
+
+        final updatedStandings = tournament.standings.map((standing) {
+          final standingRefs = [
+            standing.teamId,
+            standing.teamName,
+          ].map((value) => value.trim().toLowerCase()).toSet();
+          if (!standingRefs.any(oldRefs.contains)) return standing;
+          return StandingModel(
+            teamId: normalized.id,
+            teamName: normalized.name,
+            played: standing.played,
+            wins: standing.wins,
+            losses: standing.losses,
+            points: standing.points,
+          );
+        }).toList();
+
+        batch.set(
+          _tournaments.doc(tournament.id),
+          tournament
+              .copyWith(
+                teams: updatedTeams,
+                registeredTeams: updatedTeams.length,
+                standings: updatedStandings,
+                matches: tournament.matches.map(syncMatchTeam).toList(),
+                scheduleMatches:
+                    tournament.scheduleMatches.map(syncMatchTeam).toList(),
+                bracketMatches:
+                    tournament.bracketMatches.map(syncMatchTeam).toList(),
+              )
+              .toMap(),
+        );
+      }
+    }
+
+    await batch.commit();
   }
 
   Future<void> deleteTeam(String teamId) async {
     final team = await getTeam(teamId);
-    await _teams.doc(teamId).delete();
+    final batch = _db.batch();
+    batch.delete(_teams.doc(teamId));
 
-    if (team == null) return;
+    if (team == null) {
+      await batch.commit();
+      return;
+    }
     final tournaments = await getTournaments();
     for (final tournament in tournaments.where((entry) =>
         entry.teams.any((registeredTeam) => registeredTeam.id == teamId))) {
+      final names = {
+        teamId.trim().toLowerCase(),
+        team.name.trim().toLowerCase(),
+      }..remove('');
+      bool referencesDeletedTeam(MatchModel match) {
+        return [
+          match.team1Id,
+          match.team2Id,
+          match.winnerId,
+        ].whereType<String>().any((value) => names.contains(
+              value.trim().toLowerCase(),
+            ));
+      }
+
       final updatedTeams = tournament.teams
           .where((registeredTeam) => registeredTeam.id != teamId)
           .toList();
-      await saveTournament(
-        tournament.copyWith(
-          teams: updatedTeams,
-          registeredTeams: updatedTeams.length,
-        ),
+      final updatedStandings = tournament.standings.where((standing) {
+        return !names.contains(standing.teamId.trim().toLowerCase()) &&
+            !names.contains(standing.teamName.trim().toLowerCase());
+      }).toList();
+      final updatedScheduleMatches = tournament.scheduleMatches
+          .where((match) => !referencesDeletedTeam(match))
+          .toList();
+      final updatedBracketMatches = tournament.bracketMatches
+          .where((match) => !referencesDeletedTeam(match))
+          .toList();
+      final updatedLegacyMatches = tournament.matches
+          .where((match) => !referencesDeletedTeam(match))
+          .toList();
+
+      batch.set(
+        _tournaments.doc(tournament.id),
+        tournament
+            .copyWith(
+              teams: updatedTeams,
+              registeredTeams: updatedTeams.length,
+              standings: updatedStandings,
+              scheduleMatches: updatedScheduleMatches,
+              bracketMatches: updatedBracketMatches,
+              matches: updatedLegacyMatches,
+            )
+            .toMap(),
       );
     }
+
+    if (team.ownerEmail?.trim().isNotEmpty == true) {
+      batch.set(
+        _users.doc(_normalizeEmail(team.ownerEmail!)),
+        {'teamId': null},
+        SetOptions(merge: true),
+      );
+    }
+
+    await batch.commit();
   }
 
   Future<void> registerTeamForTournament({

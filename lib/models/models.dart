@@ -707,6 +707,8 @@ class TournamentModel {
   final int maxTeams;
   final int registeredTeams;
   final List<MatchModel> matches;
+  final List<MatchModel> scheduleMatches;
+  final List<MatchModel> bracketMatches;
   final DateTime? startDate;
   final DateTime? endDate;
   final String? organizerId;
@@ -735,6 +737,8 @@ class TournamentModel {
     this.maxTeams = 16,
     this.registeredTeams = 0,
     this.matches = const [],
+    this.scheduleMatches = const [],
+    this.bracketMatches = const [],
     this.startDate,
     this.endDate,
     this.organizerId,
@@ -754,6 +758,9 @@ class TournamentModel {
 
   bool get isFull => registeredTeams >= maxTeams;
   int get spotsLeft => maxTeams - registeredTeams;
+  List<MatchModel> get scheduleEntries =>
+      scheduleMatches.isNotEmpty ? scheduleMatches : matches;
+  List<MatchModel> get bracketEntries => bracketMatches;
 
   // Computed display getters
   String get prizePoolDisplay => prizePool != null ? '\$$prizePool' : 'TBA';
@@ -778,6 +785,8 @@ class TournamentModel {
     int? maxTeams,
     int? registeredTeams,
     List<MatchModel>? matches,
+    List<MatchModel>? scheduleMatches,
+    List<MatchModel>? bracketMatches,
     Object? startDate = _unset,
     Object? endDate = _unset,
     Object? organizerId = _unset,
@@ -808,6 +817,8 @@ class TournamentModel {
         maxTeams: maxTeams ?? this.maxTeams,
         registeredTeams: registeredTeams ?? this.registeredTeams,
         matches: matches ?? this.matches,
+        scheduleMatches: scheduleMatches ?? this.scheduleMatches,
+        bracketMatches: bracketMatches ?? this.bracketMatches,
         startDate: identical(startDate, _unset)
             ? this.startDate
             : startDate as DateTime?,
@@ -850,6 +861,8 @@ class TournamentModel {
         'maxTeams': maxTeams,
         'registeredTeams': registeredTeams,
         'matches': matches.map((m) => m.toMap()).toList(),
+        'scheduleMatches': scheduleMatches.map((m) => m.toMap()).toList(),
+        'bracketMatches': bracketMatches.map((m) => m.toMap()).toList(),
         'teams': teams.map((team) => team.toMap()).toList(),
         'standings': standings.map((standing) => standing.toMap()).toList(),
         'startDate': startDate?.toIso8601String(),
@@ -867,49 +880,61 @@ class TournamentModel {
         'isArchived': isArchived,
       };
 
-  factory TournamentModel.fromMap(Map<String, dynamic> map) => TournamentModel(
-        id: map['id'] ?? '',
-        title: map['title'] ?? '',
-        game: GameTitle.values.firstWhere((g) => g.name == map['game'],
-            orElse: () => GameTitle.other),
-        status: TournamentStatus.values.firstWhere(
-            (s) => s.name == map['status'],
-            orElse: () => TournamentStatus.upcoming),
-        format: TournamentFormat.values.firstWhere(
-            (f) => f.name == map['format'],
-            orElse: () => TournamentFormat.singleElim),
-        description: map['description'],
-        prizePool: map['prizePool'],
-        maxTeams: map['maxTeams'] ?? 16,
-        registeredTeams: map['registeredTeams'] ?? 0,
-        matches: (map['matches'] as List<dynamic>? ?? [])
-            .map((m) => MatchModel.fromMap(m as Map<String, dynamic>))
-            .toList(),
-        teams: (map['teams'] as List<dynamic>? ?? [])
-            .map((team) =>
-                TeamModel.fromMap(Map<String, dynamic>.from(team as Map)))
-            .toList(),
-        standings: (map['standings'] as List<dynamic>? ?? [])
-            .map((standing) => StandingModel.fromMap(
-                Map<String, dynamic>.from(standing as Map)))
-            .toList(),
-        startDate: map['startDate'] != null
-            ? DateTime.tryParse(map['startDate'])
-            : null,
-        endDate:
-            map['endDate'] != null ? DateTime.tryParse(map['endDate']) : null,
-        organizerId: map['organizerId'],
-        bannerUrl: map['bannerUrl'],
-        logoUrl: map['logoUrl'],
-        isVerified: map['isVerified'] ?? false,
-        isFeatured: map['isFeatured'] ?? false,
-        organizer: map['organizer'],
-        location: map['location'],
-        registrationDeadline: map['registrationDeadline'] != null
-            ? DateTime.tryParse(map['registrationDeadline'])
-            : null,
-        type: map['type'] ?? 'Squad',
-        requirements: map['requirements'],
-        isArchived: map['isArchived'] ?? false,
-      );
+  factory TournamentModel.fromMap(Map<String, dynamic> map) {
+    List<MatchModel> parseMatches(String key) =>
+        (map[key] as List<dynamic>? ?? [])
+            .map((m) => MatchModel.fromMap(Map<String, dynamic>.from(m as Map)))
+            .toList();
+
+    final legacyMatches = parseMatches('matches');
+    final hasScheduleMatches = map.containsKey('scheduleMatches');
+    final scheduleMatches =
+        hasScheduleMatches ? parseMatches('scheduleMatches') : legacyMatches;
+    final bracketMatches = map.containsKey('bracketMatches')
+        ? parseMatches('bracketMatches')
+        : <MatchModel>[];
+
+    return TournamentModel(
+      id: map['id'] ?? '',
+      title: map['title'] ?? '',
+      game: GameTitle.values.firstWhere((g) => g.name == map['game'],
+          orElse: () => GameTitle.other),
+      status: TournamentStatus.values.firstWhere((s) => s.name == map['status'],
+          orElse: () => TournamentStatus.upcoming),
+      format: TournamentFormat.values.firstWhere((f) => f.name == map['format'],
+          orElse: () => TournamentFormat.singleElim),
+      description: map['description'],
+      prizePool: map['prizePool'],
+      maxTeams: map['maxTeams'] ?? 16,
+      registeredTeams: map['registeredTeams'] ?? 0,
+      matches: legacyMatches,
+      scheduleMatches: scheduleMatches,
+      bracketMatches: bracketMatches,
+      teams: (map['teams'] as List<dynamic>? ?? [])
+          .map((team) =>
+              TeamModel.fromMap(Map<String, dynamic>.from(team as Map)))
+          .toList(),
+      standings: (map['standings'] as List<dynamic>? ?? [])
+          .map((standing) =>
+              StandingModel.fromMap(Map<String, dynamic>.from(standing as Map)))
+          .toList(),
+      startDate:
+          map['startDate'] != null ? DateTime.tryParse(map['startDate']) : null,
+      endDate:
+          map['endDate'] != null ? DateTime.tryParse(map['endDate']) : null,
+      organizerId: map['organizerId'],
+      bannerUrl: map['bannerUrl'],
+      logoUrl: map['logoUrl'],
+      isVerified: map['isVerified'] ?? false,
+      isFeatured: map['isFeatured'] ?? false,
+      organizer: map['organizer'],
+      location: map['location'],
+      registrationDeadline: map['registrationDeadline'] != null
+          ? DateTime.tryParse(map['registrationDeadline'])
+          : null,
+      type: map['type'] ?? 'Squad',
+      requirements: map['requirements'],
+      isArchived: map['isArchived'] ?? false,
+    );
+  }
 }

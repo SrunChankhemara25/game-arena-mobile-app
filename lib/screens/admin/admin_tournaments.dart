@@ -1683,7 +1683,12 @@ class _TournamentTeamsTab extends StatelessWidget {
                       label: 'Edit Lineup',
                       icon: Icons.edit_rounded,
                       onTap: () {
-                        _showLineupEditor(context, team, onChanged);
+                        _showLineupEditor(
+                          context,
+                          tournament,
+                          team,
+                          onChanged,
+                        );
                       },
                     ),
                   ),
@@ -1704,6 +1709,32 @@ class _TournamentTeamsTab extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              OutlineBtn(
+                label: 'Delete Team',
+                icon: Icons.delete_outline_rounded,
+                color: AC.red,
+                onTap: () async {
+                  final confirm = await showConfirmDialog(
+                    context,
+                    title: 'Delete team?',
+                    message:
+                        'This will remove "${team.teamName}" from the tournament and also delete their standing entry.',
+                    confirmLabel: 'Delete',
+                    confirmColor: AC.red,
+                    icon: Icons.delete_outline_rounded,
+                  );
+                  if (confirm) {
+                    tournament.registrants.remove(team);
+                    tournament.standings.removeWhere(
+                      (s) =>
+                          s.teamName.trim().toLowerCase() ==
+                          team.teamName.trim().toLowerCase(),
+                    );
+                    onChanged();
+                  }
+                },
               ),
             ],
           ),
@@ -1893,11 +1924,121 @@ class _RosterPreviewSheet extends StatelessWidget {
   }
 }
 
+bool _sameTeamName(String left, String right) =>
+    left.trim().toLowerCase() == right.trim().toLowerCase();
+
+List<String> _teamChoices(
+  Tournament tournament, {
+  String? current,
+  bool includeTbd = false,
+}) {
+  final values = <String>[];
+  final seen = <String>{};
+
+  void addChoice(String? value) {
+    final name = value?.trim() ?? '';
+    if (name.isEmpty) return;
+    if (seen.add(name.toLowerCase())) values.add(name);
+  }
+
+  if (includeTbd) addChoice('TBD');
+  for (final team in tournament.registrants) {
+    addChoice(team.teamName);
+  }
+  addChoice(current);
+  return values;
+}
+
+void _syncTournamentTeamReferences(
+  Tournament tournament, {
+  required String oldName,
+  required String newName,
+}) {
+  if (oldName.trim().isEmpty ||
+      newName.trim().isEmpty ||
+      _sameTeamName(oldName, newName)) {
+    return;
+  }
+
+  for (final schedule in tournament.schedules) {
+    if (_sameTeamName(schedule.teamA, oldName)) schedule.teamA = newName;
+    if (_sameTeamName(schedule.teamB, oldName)) schedule.teamB = newName;
+  }
+
+  for (final round in tournament.bracketRounds) {
+    for (final match in round.matches) {
+      if (_sameTeamName(match.teamA, oldName)) match.teamA = newName;
+      if (_sameTeamName(match.teamB, oldName)) match.teamB = newName;
+      if (match.winner != null && _sameTeamName(match.winner!, oldName)) {
+        match.winner = newName;
+      }
+    }
+  }
+
+  for (final standing in tournament.standings) {
+    if (_sameTeamName(standing.teamName, oldName)) {
+      standing.teamName = newName;
+    }
+  }
+}
+
+class _TeamNameDropdown extends StatelessWidget {
+  final String value;
+  final List<String> choices;
+  final String hint;
+  final IconData icon;
+  final ValueChanged<String> onChanged;
+
+  const _TeamNameDropdown({
+    required this.value,
+    required this.choices,
+    required this.hint,
+    required this.icon,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = choices.any((choice) => _sameTeamName(choice, value))
+        ? choices.firstWhere((choice) => _sameTeamName(choice, value))
+        : null;
+
+    return DropdownButtonFormField<String>(
+      key: ValueKey('$hint-$selected-${choices.join('|')}'),
+      initialValue: selected,
+      isExpanded: true,
+      dropdownColor: AC.bg3,
+      style: const TextStyle(color: AC.textPrimary),
+      decoration: fieldDecor(hint: hint, icon: icon),
+      items: choices
+          .map(
+            (name) => DropdownMenuItem<String>(
+              value: name,
+              child: Text(
+                name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: choices.isEmpty
+          ? null
+          : (selected) {
+              if (selected == null) return;
+              onChanged(selected);
+            },
+    );
+  }
+}
+
 void _showLineupEditor(
   BuildContext context,
+  Tournament tournament,
   TeamReg team,
   VoidCallback onChanged,
 ) {
+  final teamNameCtrl = TextEditingController(text: team.teamName);
+  final regionCtrl = TextEditingController(text: team.region);
   final coachCtrl = TextEditingController(text: team.coach ?? '');
   final assistantCtrl = TextEditingController(text: team.assistantCoach ?? '');
   final managerCtrl = TextEditingController(text: team.manager ?? '');
@@ -1941,6 +2082,24 @@ void _showLineupEditor(
                   const SizedBox(height: 18),
                   Text('Update Lineup', style: AT.heading),
                   const SizedBox(height: 16),
+                  TextField(
+                    controller: teamNameCtrl,
+                    style: const TextStyle(color: AC.textPrimary),
+                    decoration: fieldDecor(
+                      hint: 'Team name',
+                      icon: Icons.groups_rounded,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: regionCtrl,
+                    style: const TextStyle(color: AC.textPrimary),
+                    decoration: fieldDecor(
+                      hint: 'Region',
+                      icon: Icons.flag_rounded,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: coachCtrl,
                     style: const TextStyle(color: AC.textPrimary),
@@ -2023,6 +2182,14 @@ void _showLineupEditor(
                     width: double.infinity,
                     icon: Icons.check_rounded,
                     onTap: () {
+                      final oldName = team.teamName;
+                      final newName = teamNameCtrl.text.trim().isEmpty
+                          ? team.teamName
+                          : teamNameCtrl.text.trim();
+                      team.teamName = newName;
+                      team.region = regionCtrl.text.trim().isEmpty
+                          ? team.region
+                          : regionCtrl.text.trim();
                       team.coach = coachCtrl.text.trim();
                       team.assistantCoach = assistantCtrl.text.trim();
                       team.manager = managerCtrl.text.trim();
@@ -2030,6 +2197,11 @@ void _showLineupEditor(
                           .map((controller) => controller.text.trim())
                           .where((player) => player.isNotEmpty)
                           .toList();
+                      _syncTournamentTeamReferences(
+                        tournament,
+                        oldName: oldName,
+                        newName: newName,
+                      );
                       onChanged();
                       Navigator.pop(context);
                     },
@@ -2203,136 +2375,136 @@ class _TournamentScheduleTab extends StatelessWidget {
 
   void _showScheduleEditor(BuildContext context, {ScheduleEntry? existing}) {
     final roundCtrl = TextEditingController(text: existing?.round ?? '');
-    final teamACtrl = TextEditingController(text: existing?.teamA ?? '');
-    final teamBCtrl = TextEditingController(text: existing?.teamB ?? '');
     final dateCtrl = TextEditingController(text: existing?.date ?? '');
     final timeCtrl = TextEditingController(text: existing?.time ?? '');
     final venueCtrl = TextEditingController(text: existing?.venue ?? '');
+    var teamA = existing?.teamA ?? '';
+    var teamB = existing?.teamB ?? '';
 
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
-        decoration: const BoxDecoration(
-          color: AC.bg1,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            physics: const ClampingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AC.border,
-                      borderRadius: BorderRadius.circular(999),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          decoration: const BoxDecoration(
+            color: AC.bg1,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AC.border,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  existing == null
-                      ? 'Add Match Schedule'
-                      : 'Edit Match Schedule',
-                  style: AT.heading,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: roundCtrl,
-                  style: const TextStyle(color: AC.textPrimary),
-                  decoration: fieldDecor(
-                    hint: 'Round or stage',
-                    icon: Icons.flag_rounded,
+                  const SizedBox(height: 18),
+                  Text(
+                    existing == null
+                        ? 'Add Match Schedule'
+                        : 'Edit Match Schedule',
+                    style: AT.heading,
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: teamACtrl,
-                  style: const TextStyle(color: AC.textPrimary),
-                  decoration: fieldDecor(
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: roundCtrl,
+                    style: const TextStyle(color: AC.textPrimary),
+                    decoration: fieldDecor(
+                      hint: 'Round or stage',
+                      icon: Icons.flag_rounded,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _TeamNameDropdown(
+                    value: teamA,
+                    choices: _teamChoices(tournament, current: teamA),
                     hint: 'Team A',
                     icon: Icons.group_rounded,
+                    onChanged: (value) => setModalState(() => teamA = value),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: teamBCtrl,
-                  style: const TextStyle(color: AC.textPrimary),
-                  decoration: fieldDecor(
+                  const SizedBox(height: 12),
+                  _TeamNameDropdown(
+                    value: teamB,
+                    choices: _teamChoices(tournament, current: teamB),
                     hint: 'Team B',
                     icon: Icons.group_rounded,
+                    onChanged: (value) => setModalState(() => teamB = value),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: dateCtrl,
-                  style: const TextStyle(color: AC.textPrimary),
-                  decoration: fieldDecor(
-                    hint: 'Date (YYYY-MM-DD)',
-                    icon: Icons.calendar_month_rounded,
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: dateCtrl,
+                    style: const TextStyle(color: AC.textPrimary),
+                    decoration: fieldDecor(
+                      hint: 'Date (YYYY-MM-DD)',
+                      icon: Icons.calendar_month_rounded,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: timeCtrl,
-                  style: const TextStyle(color: AC.textPrimary),
-                  decoration: fieldDecor(
-                    hint: 'Time (HH:MM)',
-                    icon: Icons.access_time_rounded,
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: timeCtrl,
+                    style: const TextStyle(color: AC.textPrimary),
+                    decoration: fieldDecor(
+                      hint: 'Time (HH:MM)',
+                      icon: Icons.access_time_rounded,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: venueCtrl,
-                  style: const TextStyle(color: AC.textPrimary),
-                  decoration: fieldDecor(
-                    hint: 'Venue',
-                    icon: Icons.place_rounded,
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: venueCtrl,
+                    style: const TextStyle(color: AC.textPrimary),
+                    decoration: fieldDecor(
+                      hint: 'Venue',
+                      icon: Icons.place_rounded,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                GradButton(
-                  label: existing == null ? 'ADD MATCH' : 'SAVE CHANGES',
-                  width: double.infinity,
-                  icon: Icons.check_rounded,
-                  onTap: () {
-                    if (existing != null) {
-                      existing.round = roundCtrl.text.trim();
-                      existing.teamA = teamACtrl.text.trim();
-                      existing.teamB = teamBCtrl.text.trim();
-                      existing.date = dateCtrl.text.trim();
-                      existing.time = timeCtrl.text.trim();
-                      existing.venue = venueCtrl.text.trim();
-                    } else {
-                      tournament.schedules.add(
-                        ScheduleEntry(
-                          id: 'schedule_${DateTime.now().millisecondsSinceEpoch}',
-                          round: roundCtrl.text.trim(),
-                          teamA: teamACtrl.text.trim(),
-                          teamB: teamBCtrl.text.trim(),
-                          date: dateCtrl.text.trim(),
-                          time: timeCtrl.text.trim(),
-                          venue: venueCtrl.text.trim(),
-                        ),
-                      );
-                    }
-                    onChanged();
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  GradButton(
+                    label: existing == null ? 'ADD MATCH' : 'SAVE CHANGES',
+                    width: double.infinity,
+                    icon: Icons.check_rounded,
+                    onTap: () {
+                      if (existing != null) {
+                        existing.round = roundCtrl.text.trim();
+                        existing.teamA = teamA.trim();
+                        existing.teamB = teamB.trim();
+                        existing.date = dateCtrl.text.trim();
+                        existing.time = timeCtrl.text.trim();
+                        existing.venue = venueCtrl.text.trim();
+                      } else {
+                        tournament.schedules.add(
+                          ScheduleEntry(
+                            id: 'schedule_${DateTime.now().millisecondsSinceEpoch}',
+                            round: roundCtrl.text.trim(),
+                            teamA: teamA.trim(),
+                            teamB: teamB.trim(),
+                            date: dateCtrl.text.trim(),
+                            time: timeCtrl.text.trim(),
+                            venue: venueCtrl.text.trim(),
+                          ),
+                        );
+                      }
+                      onChanged();
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -2451,10 +2623,13 @@ class _TournamentBracketTab extends StatelessWidget {
                     child: GradButton(
                       label: 'Add',
                       onTap: () {
+                        final roundName = nameCtrl.text.trim().isEmpty
+                            ? 'Round ${tournament.bracketRounds.length + 1}'
+                            : nameCtrl.text.trim();
                         tournament.bracketRounds.add(
                           BracketRound(
                             id: 'round_${DateTime.now().millisecondsSinceEpoch}',
-                            roundName: nameCtrl.text.trim(),
+                            roundName: roundName,
                             matches: [
                               MatchNode(
                                 id: 'match_${DateTime.now().millisecondsSinceEpoch}',
@@ -2631,13 +2806,27 @@ class _BracketRoundColumn extends StatelessWidget {
   }
 
   void _showMatchEditor(BuildContext context, MatchNode match) {
-    final teamACtrl = TextEditingController(text: match.teamA);
-    final teamBCtrl = TextEditingController(text: match.teamB);
     final scoreACtrl = TextEditingController(text: '${match.scoreA}');
     final scoreBCtrl = TextEditingController(text: '${match.scoreB}');
     final dateCtrl = TextEditingController(text: match.date ?? '');
     final timeCtrl = TextEditingController(text: match.time ?? '');
-    String winner = match.winner ?? match.teamA;
+    var teamA = match.teamA;
+    var teamB = match.teamB;
+    String? winner =
+        match.winner?.trim().isNotEmpty == true && match.winner != 'TBD'
+            ? match.winner
+            : null;
+
+    List<String> winnerChoices() {
+      final seen = <String>{};
+      final choices = <String>[];
+      for (final value in [teamA, teamB]) {
+        final name = value.trim();
+        if (name.isEmpty || name == 'TBD') continue;
+        if (seen.add(name.toLowerCase())) choices.add(name);
+      }
+      return choices;
+    }
 
     showModalBottomSheet<void>(
       context: context,
@@ -2675,22 +2864,34 @@ class _BracketRoundColumn extends StatelessWidget {
                   const SizedBox(height: 18),
                   const Text('Edit Match', style: AT.heading),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: teamACtrl,
-                    style: const TextStyle(color: AC.textPrimary),
-                    decoration: fieldDecor(
-                      hint: 'Team A',
-                      icon: Icons.group_rounded,
+                  _TeamNameDropdown(
+                    value: teamA,
+                    choices: _teamChoices(
+                      tournament,
+                      current: teamA,
+                      includeTbd: true,
                     ),
+                    hint: 'Team A',
+                    icon: Icons.group_rounded,
+                    onChanged: (value) => setModalState(() {
+                      teamA = value;
+                      if (!winnerChoices().contains(winner)) winner = null;
+                    }),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: teamBCtrl,
-                    style: const TextStyle(color: AC.textPrimary),
-                    decoration: fieldDecor(
-                      hint: 'Team B',
-                      icon: Icons.group_rounded,
+                  _TeamNameDropdown(
+                    value: teamB,
+                    choices: _teamChoices(
+                      tournament,
+                      current: teamB,
+                      includeTbd: true,
                     ),
+                    hint: 'Team B',
+                    icon: Icons.group_rounded,
+                    onChanged: (value) => setModalState(() {
+                      teamB = value;
+                      if (!winnerChoices().contains(winner)) winner = null;
+                    }),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -2739,25 +2940,31 @@ class _BracketRoundColumn extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: winner,
+                  DropdownButtonFormField<String?>(
+                    initialValue:
+                        winnerChoices().contains(winner) ? winner : null,
                     dropdownColor: AC.bg3,
                     style: const TextStyle(color: AC.textPrimary, fontSize: 14),
                     decoration: fieldDecor(
                       hint: 'Winner',
                       icon: Icons.emoji_events_rounded,
                     ),
-                    items: [teamACtrl.text, teamBCtrl.text]
-                        .where((name) => name.trim().isNotEmpty)
-                        .map(
-                          (name) => DropdownMenuItem<String>(
-                            value: name,
-                            child: Text(name),
-                          ),
-                        )
-                        .toList(),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(
+                          'Not finalized',
+                          style: AT.body.copyWith(color: AC.textSecondary),
+                        ),
+                      ),
+                      ...winnerChoices().map(
+                        (name) => DropdownMenuItem<String?>(
+                          value: name,
+                          child: Text(name),
+                        ),
+                      ),
+                    ],
                     onChanged: (value) {
-                      if (value == null) return;
                       setModalState(() => winner = value);
                     },
                   ),
@@ -2767,24 +2974,25 @@ class _BracketRoundColumn extends StatelessWidget {
                     width: double.infinity,
                     icon: Icons.check_rounded,
                     onTap: () {
-                      match.teamA = teamACtrl.text.trim();
-                      match.teamB = teamBCtrl.text.trim();
+                      match.teamA = teamA.trim();
+                      match.teamB = teamB.trim();
                       match.scoreA = int.tryParse(scoreACtrl.text.trim()) ?? 0;
                       match.scoreB = int.tryParse(scoreBCtrl.text.trim()) ?? 0;
                       match.date = dateCtrl.text.trim();
                       match.time = timeCtrl.text.trim();
                       match.winner = winner;
-                      match.isFinalized = true;
+                      match.isFinalized = winner?.trim().isNotEmpty == true;
 
-                      if (roundIndex + 1 < tournament.bracketRounds.length) {
+                      if (match.isFinalized &&
+                          roundIndex + 1 < tournament.bracketRounds.length) {
                         final nextRound =
                             tournament.bracketRounds[roundIndex + 1];
                         if (nextRound.matches.isNotEmpty) {
                           final nextMatch = nextRound.matches.first;
                           if (nextMatch.teamA == 'TBD') {
-                            nextMatch.teamA = winner;
+                            nextMatch.teamA = winner!;
                           } else if (nextMatch.teamB == 'TBD') {
-                            nextMatch.teamB = winner;
+                            nextMatch.teamB = winner!;
                           }
                         }
                       }
@@ -2858,9 +3066,43 @@ class _TournamentStandingsTab extends StatelessWidget {
     required this.onChanged,
   });
 
+  // Ensure every registered team has a standing entry (auto-sync)
+  List<StandingEntry> _syncedStandings() {
+    final registeredNames = tournament.registrants
+        .map((t) => t.teamName.trim().toLowerCase())
+        .toSet();
+
+    // Remove standings for teams no longer in Teams tab
+    tournament.standings.removeWhere(
+      (s) => !registeredNames.contains(s.teamName.trim().toLowerCase()),
+    );
+
+    // Add a blank standing for any team not yet in standings
+    final existingNames = tournament.standings
+        .map((s) => s.teamName.trim().toLowerCase())
+        .toSet();
+    for (final team in tournament.registrants) {
+      if (!existingNames.contains(team.teamName.trim().toLowerCase())) {
+        tournament.standings.add(
+          StandingEntry(
+            id: 'standing_${team.teamName.trim().toLowerCase().replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}',
+            teamName: team.teamName.trim(),
+            played: 0,
+            wins: 0,
+            losses: 0,
+            gameWins: 0,
+            gameLosses: 0,
+            points: 0,
+          ),
+        );
+      }
+    }
+    return tournament.standings;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final standings = tournament.standings;
+    final standings = _syncedStandings();
     return Column(
       children: [
         // ── Header Bar ──────────────────────────────────────────────────────
@@ -2880,11 +3122,6 @@ class _TournamentStandingsTab extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              OutlineBtn(
-                label: 'Add',
-                icon: Icons.add_rounded,
-                onTap: () => _showStandingEditor(context),
               ),
             ],
           ),
@@ -2910,8 +3147,8 @@ class _TournamentStandingsTab extends StatelessWidget {
           child: standings.isEmpty
               ? const EmptyState(
                   icon: Icons.leaderboard_outlined,
-                  title: 'No standings yet',
-                  subtitle: 'Add team standings to display rankings here.',
+                  title: 'No teams yet',
+                  subtitle: 'Add teams in the Teams tab to see standings here.',
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -2926,20 +3163,7 @@ class _TournamentStandingsTab extends StatelessWidget {
                         context,
                         existing: standing,
                       ),
-                      onDelete: () async {
-                        final confirm = await showConfirmDialog(
-                          context,
-                          title: 'Delete standing?',
-                          message: 'The selected standing row will be removed.',
-                          confirmLabel: 'Delete',
-                          confirmColor: AC.red,
-                          icon: Icons.delete_outline_rounded,
-                        );
-                        if (confirm) {
-                          tournament.standings.remove(standing);
-                          onChanged();
-                        }
-                      },
+                      onDelete: null, // deletion happens via Teams tab
                     );
                   },
                 ),
@@ -2966,16 +3190,15 @@ class _TournamentStandingsTab extends StatelessWidget {
     );
   }
 
-  void _showStandingEditor(BuildContext context, {StandingEntry? existing}) {
-    final teamCtrl = TextEditingController(text: existing?.teamName ?? '');
-    final playedCtrl = TextEditingController(text: '${existing?.played ?? 0}');
-    final winsCtrl = TextEditingController(text: '${existing?.wins ?? 0}');
-    final lossesCtrl = TextEditingController(text: '${existing?.losses ?? 0}');
-    final gameWinsCtrl =
-        TextEditingController(text: '${existing?.gameWins ?? 0}');
+  void _showStandingEditor(BuildContext context,
+      {required StandingEntry existing}) {
+    final playedCtrl = TextEditingController(text: '${existing.played}');
+    final winsCtrl = TextEditingController(text: '${existing.wins}');
+    final lossesCtrl = TextEditingController(text: '${existing.losses}');
+    final gameWinsCtrl = TextEditingController(text: '${existing.gameWins}');
     final gameLossesCtrl =
-        TextEditingController(text: '${existing?.gameLosses ?? 0}');
-    final pointsCtrl = TextEditingController(text: '${existing?.points ?? 0}');
+        TextEditingController(text: '${existing.gameLosses}');
+    final pointsCtrl = TextEditingController(text: '${existing.points}');
 
     showModalBottomSheet<void>(
       context: context,
@@ -3011,19 +3234,10 @@ class _TournamentStandingsTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  existing == null ? 'Add Standing' : 'Edit Standing',
+                  'Edit Standing — ${existing.teamName}',
                   style: AT.heading,
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: teamCtrl,
-                  style: const TextStyle(color: AC.textPrimary),
-                  decoration: fieldDecor(
-                    hint: 'Team name',
-                    icon: Icons.group_rounded,
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -3109,38 +3323,19 @@ class _TournamentStandingsTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 GradButton(
-                  label: existing == null ? 'ADD STANDING' : 'SAVE CHANGES',
+                  label: 'SAVE CHANGES',
                   width: double.infinity,
                   icon: Icons.check_rounded,
                   onTap: () {
-                    if (existing != null) {
-                      existing.teamName = teamCtrl.text.trim();
-                      existing.played =
-                          int.tryParse(playedCtrl.text.trim()) ?? 0;
-                      existing.wins = int.tryParse(winsCtrl.text.trim()) ?? 0;
-                      existing.losses =
-                          int.tryParse(lossesCtrl.text.trim()) ?? 0;
-                      existing.gameWins =
-                          int.tryParse(gameWinsCtrl.text.trim()) ?? 0;
-                      existing.gameLosses =
-                          int.tryParse(gameLossesCtrl.text.trim()) ?? 0;
-                      existing.points =
-                          int.tryParse(pointsCtrl.text.trim()) ?? 0;
-                    } else {
-                      tournament.standings.add(
-                        StandingEntry(
-                          id: 'standing_${DateTime.now().millisecondsSinceEpoch}',
-                          teamName: teamCtrl.text.trim(),
-                          played: int.tryParse(playedCtrl.text.trim()) ?? 0,
-                          wins: int.tryParse(winsCtrl.text.trim()) ?? 0,
-                          losses: int.tryParse(lossesCtrl.text.trim()) ?? 0,
-                          gameWins: int.tryParse(gameWinsCtrl.text.trim()) ?? 0,
-                          gameLosses:
-                              int.tryParse(gameLossesCtrl.text.trim()) ?? 0,
-                          points: int.tryParse(pointsCtrl.text.trim()) ?? 0,
-                        ),
-                      );
-                    }
+                    existing.teamName = existing.teamName; // name stays fixed
+                    existing.played = int.tryParse(playedCtrl.text.trim()) ?? 0;
+                    existing.wins = int.tryParse(winsCtrl.text.trim()) ?? 0;
+                    existing.losses = int.tryParse(lossesCtrl.text.trim()) ?? 0;
+                    existing.gameWins =
+                        int.tryParse(gameWinsCtrl.text.trim()) ?? 0;
+                    existing.gameLosses =
+                        int.tryParse(gameLossesCtrl.text.trim()) ?? 0;
+                    existing.points = int.tryParse(pointsCtrl.text.trim()) ?? 0;
                     onChanged();
                     Navigator.pop(context);
                   },
@@ -3160,7 +3355,7 @@ class _StandingCard extends StatelessWidget {
   final int total;
   final StandingEntry standing;
   final VoidCallback onTap;
-  final Future<void> Function() onDelete;
+  final Future<void> Function()? onDelete;
 
   const _StandingCard({
     required this.rank,

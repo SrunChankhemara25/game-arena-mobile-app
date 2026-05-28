@@ -9,8 +9,6 @@ import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 import 'verify_code_screen.dart';
 
-// ─── EXACT PATH FROM YOUR SCREENSHOT ───
-// Change 'admin_dashboard.dart' to your exact file name if it's named differently
 import 'package:gamearena_new/screens/admin/admin_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -88,14 +86,23 @@ class _LoginScreenState extends State<LoginScreen>
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(inputEmail.toLowerCase())
-          .get();
+          .get()
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw Exception(
+                'Connection timed out. Please check your internet and try again.'),
+          );
 
       final String role = userDoc.data()?['role'] as String? ?? 'user';
 
       if (!mounted) return;
 
       if (role == 'admin') {
-        await AuthService().saveUserSession(inputEmail);
+        await AuthService().sendVerificationCode(inputEmail).timeout(
+              const Duration(seconds: 10),
+              onTimeout: () => throw Exception(
+                  'Could not send verification code. Please check your internet and try again.'),
+            );
 
         if (!mounted) return;
         Navigator.pushReplacement(

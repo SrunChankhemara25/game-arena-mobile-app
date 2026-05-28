@@ -401,7 +401,10 @@ class DB {
     final userProfiles = await BackendService.instance.getUsers();
     final tournamentModels = await BackendService.instance.getTournaments();
 
-    users = userProfiles.map(_userFromProfile).toList();
+    users = userProfiles
+        .where(_isVisibleUserProfile)
+        .map(_userFromProfile)
+        .toList();
     tournaments = tournamentModels.map(_tournamentFromModel).toList();
   }
 
@@ -495,7 +498,10 @@ class DB {
   /// Real-time stream of all users — use in StreamBuilder for live updates.
   static Stream<List<AppUser>> watchUsers() {
     return BackendService.instance.watchUsers().map(
-          (profiles) => profiles.map(_userFromProfile).toList(),
+          (profiles) => profiles
+              .where(_isVisibleUserProfile)
+              .map(_userFromProfile)
+              .toList(),
         );
   }
 
@@ -518,6 +524,10 @@ class DB {
     );
   }
 
+  static bool _isVisibleUserProfile(UserModel user) {
+    return user.role != UserRole.admin;
+  }
+
   static Tournament _tournamentFromModel(TournamentModel model) {
     final registrants = model.teams.map((team) {
       return TeamReg(
@@ -537,7 +547,7 @@ class DB {
       );
     }).toList();
 
-    final schedules = model.matches
+    final schedules = model.scheduleEntries
         .map(
           (match) => ScheduleEntry(
             id: match.id,
@@ -553,7 +563,7 @@ class DB {
 
     final bracketRounds = <BracketRound>[];
     final grouped = <String, List<MatchModel>>{};
-    for (final match in model.matches) {
+    for (final match in model.bracketEntries) {
       grouped.putIfAbsent(match.round, () => []).add(match);
     }
     grouped.forEach((round, matches) {
@@ -571,7 +581,9 @@ class DB {
                   scoreB: match.score2,
                   date: _datePart(match.scheduledAt),
                   time: _timePart(match.scheduledAt),
-                  winner: _teamNameForId(model, match.winnerId),
+                  winner: match.winnerId?.trim().isNotEmpty == true
+                      ? _teamNameForId(model, match.winnerId)
+                      : null,
                   isFinalized: match.status == 'completed',
                 ),
               )
@@ -682,15 +694,22 @@ class DB {
       );
     }).toList();
 
-    final teamByName = {for (final team in teams) team.name: team.id};
-    final matches = <MatchModel>[];
+    final teamByName = <String, String>{};
+    for (final team in teams) {
+      teamByName[team.id.trim().toLowerCase()] = team.id;
+      teamByName[team.name.trim().toLowerCase()] = team.id;
+    }
+    String teamIdFor(String value) =>
+        teamByName[value.trim().toLowerCase()] ?? value;
+
+    final scheduleMatches = <MatchModel>[];
     for (final schedule in tournament.schedules) {
-      matches.add(
+      scheduleMatches.add(
         MatchModel(
           id: schedule.id,
           tournamentId: tournament.id,
-          team1Id: teamByName[schedule.teamA] ?? schedule.teamA,
-          team2Id: teamByName[schedule.teamB] ?? schedule.teamB,
+          team1Id: teamIdFor(schedule.teamA),
+          team2Id: teamIdFor(schedule.teamB),
           round: schedule.round,
           status: 'upcoming',
           scheduledAt:
@@ -699,20 +718,22 @@ class DB {
         ),
       );
     }
+    final bracketMatches = <MatchModel>[];
     for (final round in tournament.bracketRounds) {
       for (final match in round.matches) {
-        matches.removeWhere((entry) => entry.id == match.id);
-        matches.add(
+        bracketMatches.add(
           MatchModel(
             id: match.id,
             tournamentId: tournament.id,
-            team1Id: teamByName[match.teamA] ?? match.teamA,
-            team2Id: teamByName[match.teamB] ?? match.teamB,
+            team1Id: teamIdFor(match.teamA),
+            team2Id: teamIdFor(match.teamB),
             score1: match.scoreA,
             score2: match.scoreB,
             round: round.roundName,
             status: match.isFinalized ? 'completed' : 'upcoming',
-            winnerId: teamByName[match.winner ?? ''],
+            winnerId: match.winner?.trim().isNotEmpty == true
+                ? teamIdFor(match.winner!)
+                : null,
             scheduledAt:
                 '${match.date ?? ''}${match.time?.isNotEmpty == true ? ' • ${match.time}' : ''}'
                     .trim(),
@@ -724,7 +745,7 @@ class DB {
     final standings = tournament.standings
         .map(
           (standing) => StandingModel(
-            teamId: teamByName[standing.teamName] ?? standing.id,
+            teamId: teamIdFor(standing.teamName),
             teamName: standing.teamName,
             played: standing.played,
             wins: standing.wins,
@@ -733,6 +754,17 @@ class DB {
           ),
         )
         .toList();
+    final standingByTeam = <String, StandingModel>{};
+    for (final standing in standings) {
+      standingByTeam[standing.teamId.trim().toLowerCase()] = standing;
+      standingByTeam[standing.teamName.trim().toLowerCase()] = standing;
+    }
+    final syncedTeams = teams.map((team) {
+      final standing = standingByTeam[team.id.trim().toLowerCase()] ??
+          standingByTeam[team.name.trim().toLowerCase()];
+      if (standing == null) return team;
+      return team.copyWith(wins: standing.wins, losses: standing.losses);
+    }).toList();
 
     return (previous ??
             TournamentModel(
@@ -749,9 +781,11 @@ class DB {
       description: tournament.description,
       prizePool: _parsePrize(tournament.prize),
       maxTeams: tournament.maxTeams,
-      registeredTeams: teams.length,
-      matches: matches,
-      teams: teams,
+      registeredTeams: syncedTeams.length,
+      matches: [...scheduleMatches, ...bracketMatches],
+      scheduleMatches: scheduleMatches,
+      bracketMatches: bracketMatches,
+      teams: syncedTeams,
       standings: standings,
       startDate: _parseDate(tournament.startDate),
       endDate: _parseDate(tournament.endDate),
@@ -773,8 +807,11 @@ class DB {
 
   static String _teamNameForId(TournamentModel tournament, String? teamId) {
     if (teamId == null || teamId.isEmpty) return 'TBD';
+    final key = teamId.trim().toLowerCase();
     return tournament.teams
-            .where((team) => team.id == teamId)
+            .where((team) =>
+                team.id.trim().toLowerCase() == key ||
+                team.name.trim().toLowerCase() == key)
             .firstOrNull
             ?.name ??
         teamId;

@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.gamearena_new"
+    namespace = "com.khemara.gamearena"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

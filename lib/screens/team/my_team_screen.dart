@@ -56,8 +56,10 @@ class _MyTeamScreenState extends State<MyTeamScreen>
         ),
       ),
     );
+    if (!mounted) return;
     if (result != null) {
       await _persistTeam(result);
+      if (!mounted) return;
       _entranceController.forward(from: 0.0);
     }
   }
@@ -78,7 +80,7 @@ class _MyTeamScreenState extends State<MyTeamScreen>
               AppText.heading.copyWith(color: AppColors.red, letterSpacing: 1),
         ),
         content: Text(
-          'This will permanently delete your squad and all roster data. This action cannot be undone.',
+          'This will permanently delete your squad and all roster data from the database. This action cannot be undone.',
           style: AppText.body.copyWith(height: 1.6),
         ),
         actions: [
@@ -103,6 +105,7 @@ class _MyTeamScreenState extends State<MyTeamScreen>
                       .saveUserProfile(user.copyWith(teamId: null));
                 }
               }
+              if (!mounted) return;
               _entranceController.forward(from: 0.0);
             },
             child: Text('DISBAND',
@@ -114,14 +117,10 @@ class _MyTeamScreenState extends State<MyTeamScreen>
   }
 
   void _editTeamName() async {
-    if (_myTeam?.registeredTournamentIds.isNotEmpty == true) {
-      _showLockedTeamSnack();
-      return;
-    }
     final ctrl = TextEditingController(text: _myTeam?.name ?? '');
     final result = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.bg2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
@@ -141,18 +140,20 @@ class _MyTeamScreenState extends State<MyTeamScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text('CANCEL',
                 style: AppText.label.copyWith(color: AppColors.textMuted)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            onPressed: () => Navigator.pop(dialogContext, ctrl.text.trim()),
             child: Text('SAVE',
                 style: AppText.label.copyWith(color: AppColors.cyan)),
           ),
         ],
       ),
     );
+    ctrl.dispose();
+    if (!mounted) return;
     if (result != null && result.isNotEmpty && _myTeam != null) {
       await _persistTeam(_myTeam!.copyWith(name: result));
     }
@@ -185,6 +186,7 @@ class _MyTeamScreenState extends State<MyTeamScreen>
     setState(() => _myTeam = updated);
   }
 
+  // ── KEY FIX: await sheet close before opening next dialog ──
   void _showTeamMenu() {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
@@ -218,8 +220,11 @@ class _MyTeamScreenState extends State<MyTeamScreen>
               icon: Icons.edit_rounded,
               label: 'Edit Team Name',
               color: AppColors.cyan,
-              onTap: () {
-                Navigator.pop(context);
+              onTap: () async {
+                Navigator.pop(context); // close sheet
+                await Future.delayed(
+                    const Duration(milliseconds: 300)); // wait for animation
+                if (!mounted) return;
                 _editTeamName();
               },
             ),
@@ -228,8 +233,10 @@ class _MyTeamScreenState extends State<MyTeamScreen>
               icon: Icons.add_photo_alternate_rounded,
               label: 'Change Team Logo',
               color: AppColors.purple,
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
+                await Future.delayed(const Duration(milliseconds: 300));
+                if (!mounted) return;
                 _changeTeamLogo();
               },
             ),
@@ -238,8 +245,10 @@ class _MyTeamScreenState extends State<MyTeamScreen>
               icon: Icons.delete_forever_rounded,
               label: 'Disband Squad',
               color: AppColors.red,
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
+                await Future.delayed(const Duration(milliseconds: 300));
+                if (!mounted) return;
                 _deleteSquad();
               },
             ),
@@ -304,25 +313,11 @@ class _MyTeamScreenState extends State<MyTeamScreen>
   Future<void> _changeTeamLogo() async {
     final team = _myTeam;
     if (team == null) return;
-    if (team.registeredTournamentIds.isNotEmpty) {
-      _showLockedTeamSnack();
-      return;
-    }
     HapticFeedback.lightImpact();
     final picked =
         await MediaService.pickImage(maxWidth: 640, imageQuality: 76);
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     await _persistTeam(team.copyWith(logoUrl: picked.dataUrl));
-  }
-
-  void _showLockedTeamSnack() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'This team is locked after tournament registration. Admin can update approved rosters.',
-        ),
-      ),
-    );
   }
 }
 
@@ -526,7 +521,6 @@ class _HasTeamView extends StatelessWidget {
       padding: const EdgeInsets.all(24).copyWith(bottom: 120),
       child: Column(
         children: [
-          // Team Identity Card
           Container(
             padding: const EdgeInsets.all(24),
             decoration:
@@ -595,8 +589,6 @@ class _HasTeamView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Stats Row
           Row(
             children: [
               Expanded(
@@ -619,8 +611,6 @@ class _HasTeamView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Manage Team — single button (Find Events removed)
           GlowButton(
             label: 'MANAGE TEAM',
             width: double.infinity,
@@ -633,7 +623,7 @@ class _HasTeamView extends StatelessWidget {
                 MaterialPageRoute(
                   builder: (_) => TeamDetailScreen(
                     team: team,
-                    isViewOnly: team.registeredTournamentIds.isNotEmpty,
+                    isViewOnly: false,
                   ),
                 ),
               );
@@ -643,7 +633,6 @@ class _HasTeamView extends StatelessWidget {
             },
           ),
           const SizedBox(height: 40),
-
           SectionHeader(title: 'CURRENT ROSTER'),
           const SizedBox(height: 16),
           ...team.players.take(5).map((p) => Padding(
@@ -814,12 +803,15 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
         ownerEmail: widget.ownerEmail?.trim().toLowerCase(),
       );
       await BackendService.instance.saveTeam(createdTeam);
+      if (!mounted) return;
       if (widget.ownerEmail?.trim().isNotEmpty == true) {
         final owner =
             await BackendService.instance.getUserProfile(widget.ownerEmail!);
+        if (!mounted) return;
         if (owner != null) {
           await BackendService.instance
               .saveUserProfile(owner.copyWith(teamId: createdTeam.id));
+          if (!mounted) return;
         }
         await BackendService.instance.createNotification(
           AppNotificationModel(
@@ -833,6 +825,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
             teamId: createdTeam.id,
           ),
         );
+        if (!mounted) return;
       }
       HapticFeedback.heavyImpact();
       showDialog(
@@ -860,6 +853,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
         playerIndex: _players.length,
       ),
     );
+    if (!mounted) return;
     if (result != null) setState(() => _players.add(result));
   }
 
@@ -867,7 +861,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
     HapticFeedback.lightImpact();
     final picked =
         await MediaService.pickImage(maxWidth: 640, imageQuality: 76);
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(() {
       _teamLogoUrl = picked.dataUrl;
       _teamLogo = picked.path == null ? null : File(picked.path!);
@@ -1147,8 +1141,6 @@ class _Step1TeamInfoState extends State<_Step1TeamInfo> {
   void initState() {
     super.initState();
     _countryCtrl = TextEditingController(text: widget.country);
-
-    // Auto-toggle parent state to custom mode so text input is processed correctly
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.onCustomGameToggled(true);
     });
@@ -1257,8 +1249,6 @@ class _Step1TeamInfoState extends State<_Step1TeamInfo> {
             ),
             const SizedBox(height: 24),
             _buildFieldLabel('PRIMARY TITLE *'),
-
-            // Fixed: Standardized styling to match the theme color of all other input containers
             TextFormField(
               controller: widget.customGameName,
               style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
@@ -1269,13 +1259,11 @@ class _Step1TeamInfoState extends State<_Step1TeamInfo> {
               decoration: const InputDecoration(
                 hintText: 'e.g. MLBB, Valorant, PUBG, Dota 2...',
                 prefixIcon: Icon(Icons.sports_esports_outlined,
-                    color: AppColors.textMuted, size: 20), // Matched color here
+                    color: AppColors.textMuted, size: 20),
               ),
             ),
             const SizedBox(height: 24),
             _buildFieldLabel('OPERATING REGION / COUNTRY *'),
-
-            // Updated from Dropdown selection to editable TextFormField
             TextFormField(
               controller: _countryCtrl,
               style: AppText.bodyMd.copyWith(color: AppColors.textPrimary),
@@ -1427,12 +1415,9 @@ class _Step2Players extends StatelessWidget {
               final p = e.value;
               final type = p['type'] as PlayerType;
               final String ign = p['ign'] as String? ?? '';
-
-              // Crash Prevention: Fallback to '?' if the user left the IGN field blank
               final String initialLetter = ign.trim().isNotEmpty
                   ? ign.trim().substring(0, 1).toUpperCase()
                   : '?';
-
               final Color color = type == PlayerType.main
                   ? AppColors.cyan
                   : type == PlayerType.substitute
@@ -1711,7 +1696,7 @@ class _ReviewRow extends StatelessWidget {
   }
 }
 
-// ─── Add Player Sheet (shared between create wizard and manage roster) ─────────
+// ─── Add Player Sheet ─────────────────────────────────────────────────────────
 class _AddPlayerSheet extends StatefulWidget {
   final GameTitle game;
   final bool isCustomGame;
@@ -1737,8 +1722,7 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
   final _idNumber = TextEditingController();
   final _dob = TextEditingController();
   final _roleController = TextEditingController();
-  final _nationalityController =
-      TextEditingController(text: 'Cambodian'); // 👈 Added Controller
+  final _nationalityController = TextEditingController(text: 'Cambodian');
 
   late String _role;
   PlayerType _type = PlayerType.main;
@@ -1793,8 +1777,9 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
     super.initState();
     _role = _availableRoles.first;
     _roleController.text = _role;
-    _roleController
-        .addListener(() => setState(() => _role = _roleController.text));
+    _roleController.addListener(() {
+      if (mounted) setState(() => _role = _roleController.text);
+    });
   }
 
   void _save() {
@@ -1808,8 +1793,7 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
       'ign': _ign.text,
       'role': _roleController.text.isNotEmpty ? _roleController.text : _role,
       'type': _type,
-      'nationality':
-          _nationalityController.text.trim(), // 👈 Updated to save typed text
+      'nationality': _nationalityController.text.trim(),
       'idType': _idType,
       'idNumber': _idNumber.text,
       'dob': _dob.text,
@@ -1826,7 +1810,7 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
     _idNumber.dispose();
     _dob.dispose();
     _roleController.dispose();
-    _nationalityController.dispose(); // 👈 Properly disposed
+    _nationalityController.dispose();
     super.dispose();
   }
 
@@ -2115,8 +2099,6 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
                     ),
                     const SizedBox(height: 24),
                     _buildLabel('NATIONALITY *'),
-
-                    // 👈 UPDATED: Replaced dropdown with standard text input field
                     TextFormField(
                       controller: _nationalityController,
                       style:
@@ -2131,7 +2113,6 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
                             color: AppColors.textMuted, size: 20),
                       ),
                     ),
-
                     const SizedBox(height: 24),
                     _buildLabel('DATE OF BIRTH *'),
                     GestureDetector(
@@ -2153,7 +2134,7 @@ class _AddPlayerSheetState extends State<_AddPlayerSheet> {
                             child: child!,
                           ),
                         );
-                        if (date != null) {
+                        if (date != null && mounted) {
                           setState(() => _dob.text =
                               '${date.year}-${date.month.toString().padLeft(2, "0")}-${date.day.toString().padLeft(2, "0")}');
                         }
